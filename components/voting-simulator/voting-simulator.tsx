@@ -74,7 +74,8 @@ export function VotingSimulator() {
     let index = 0;
     const interval = setInterval(() => {
       if (index < activeNodes.length) {
-        setValidatedNodes(prev => [...prev, activeNodes[index].id]);
+        const nodeId = activeNodes[index].id;
+        setValidatedNodes(prev => [...prev, nodeId]);
         index++;
       } else {
         clearInterval(interval);
@@ -122,7 +123,8 @@ export function VotingSimulator() {
       }
     }, 700);
     return () => clearInterval(interval);
-  }, [simulatorStep, nodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simulatorStep]);
 
   const handleStartVoting = (choice: "YES" | "NO" | "ABSTAIN") => {
     setSimulatorChoice(choice);

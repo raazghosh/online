@@ -40,7 +40,8 @@ export function LiveDashboard() {
 
     // Simulate node latency variations in the background
     const interval = setInterval(() => {
-      nodes.forEach((node) => {
+      const currentNodes = useVotingStore.getState().nodes;
+      currentNodes.forEach((node) => {
         if (node.status !== "offline") {
           const newLatency = Math.floor(10 + Math.random() * 40);
           updateNodeLatency(node.id, newLatency);
@@ -49,7 +50,7 @@ export function LiveDashboard() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [nodes, updateNodeLatency]);
+  }, [updateNodeLatency]);
 
   if (!mounted) {
     return (

@@ -37,9 +37,9 @@
   --color-glass-border: var(--glass-border);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  
+
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  
+
   --animate-orbit: orbit 60s linear infinite;
   --animate-orbit-reverse: orbit-reverse 45s linear infinite;
   --animate-pulse-slow: pulse-slow 8s ease-in-out infinite;
@@ -48,23 +48,49 @@
 }
 
 @keyframes orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes orbit-reverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
+  from {
+    transform: rotate(360deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
 }
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.15); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(1.5deg); }
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
 }
 
 /* Custom premium visual styles */
@@ -73,14 +99,14 @@
 }
 
 .grid-bg {
-  background-image: 
+  background-image:
     linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .light .grid-bg {
-  background-image: 
+  background-image:
     linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
 }
@@ -123,13 +149,16 @@ body {
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--background);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
   opacity: 0.8;

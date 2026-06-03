@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sun, Moon, Laptop, ShieldCheck, User, LogOut } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
@@ -10,17 +11,13 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 
 export function Navbar() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState<"login" | "register" | null>(null);
-  
-  // Auth Form State
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
 
   const { theme, setTheme } = useTheme();
-  const { user, login, logout, register } = useVotingStore();
+  const { user, logout } = useVotingStore();
 
   useEffect(() => {
     setMounted(true);
@@ -40,19 +37,6 @@ export function Navbar() {
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  };
-
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || !email) return;
-    if (showAuthModal === "login") {
-      login(username, email);
-    } else {
-      register(username, email);
-    }
-    setShowAuthModal(null);
-    setUsername("");
-    setEmail("");
   };
 
   return (
@@ -140,12 +124,12 @@ export function Navbar() {
             ) : (
               <>
                 <button
-                  onClick={() => setShowAuthModal("login")}
+                  onClick={() => router.push("/login")}
                   className="text-sm font-medium text-foreground/75 hover:text-primary transition-colors cursor-pointer"
                 >
                   Log In
                 </button>
-                <Button variant="primary" size="sm" onClick={() => setShowAuthModal("register")}>
+                <Button variant="primary" size="sm" onClick={() => router.push("/register")}>
                   Register
                 </Button>
               </>
@@ -199,10 +183,10 @@ export function Navbar() {
                 </div>
               ) : (
                 <>
-                  <Button variant="secondary" onClick={() => { setMobileMenuOpen(false); setShowAuthModal("login"); }}>
+                  <Button variant="secondary" onClick={() => { setMobileMenuOpen(false); router.push("/login"); }}>
                     Log In
                   </Button>
-                  <Button variant="primary" onClick={() => { setMobileMenuOpen(false); setShowAuthModal("register"); }}>
+                  <Button variant="primary" onClick={() => { setMobileMenuOpen(false); router.push("/register"); }}>
                     Register
                   </Button>
                 </>
@@ -232,71 +216,6 @@ export function Navbar() {
         )}
       </AnimatePresence>
 
-      {/* Auth Modals (Login/Register) */}
-      <AnimatePresence>
-        {showAuthModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-md"
-            >
-              <Card className="shadow-2xl relative border-border/80 bg-background/95">
-                <button
-                  onClick={() => setShowAuthModal(null)}
-                  className="absolute top-4 right-4 p-1.5 rounded-lg text-foreground/50 hover:text-foreground hover:bg-surface transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                <h3 className="text-xl font-bold tracking-tight mb-2 text-foreground">
-                  {showAuthModal === "login" ? "Welcome Back to SecureVote" : "Create Your Secure Account"}
-                </h3>
-                <p className="text-sm text-foreground/60 mb-6">
-                  {showAuthModal === "login"
-                    ? "Enter credentials to access your secure election dashboard."
-                    : "Register to configure ballots and participate in global elections."}
-                </p>
-
-                <form onSubmit={handleAuthSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/60 mb-1.5">
-                      Username / Organization Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Acme Corporation"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-surface border border-border text-foreground placeholder-foreground/30 focus:border-primary focus:outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/60 mb-1.5">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-surface border border-border text-foreground placeholder-foreground/30 focus:border-primary focus:outline-none transition-colors"
-                    />
-                  </div>
-
-                  <Button type="submit" variant="primary" className="w-full py-3 mt-2">
-                    {showAuthModal === "login" ? "Sign In" : "Register Credentials"}
-                  </Button>
-                </form>
-              </Card>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </>
   );
 }
