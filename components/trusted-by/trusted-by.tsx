@@ -28,7 +28,7 @@ export function TrustedBy() {
           </div>
 
           {/* Logo Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10 w-full lg:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 w-full lg:w-auto">
             {logos.map((logo, idx) => {
               const Icon = logo.icon;
               return (

@@ -92,7 +92,7 @@ function LoginPageContent() {
       setSubmitSuccess(true);
       
       setTimeout(() => {
-        router.push("/");
+        router.push("/feed");
       }, 1500);
     } catch (err: any) {
       setSubmitError(err?.message || "Authentication process failed.");
@@ -125,7 +125,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 select-none">
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 select-none">
       {/* Background Glow Elements */}
       <div className="absolute top-[10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/10 blur-[130px] animate-pulse-slow pointer-events-none -z-10" />
       <div className="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-accent/10 blur-[140px] pointer-events-none -z-10" />
@@ -134,7 +134,7 @@ function LoginPageContent() {
       <div className="absolute inset-0 grid-bg opacity-[0.3] pointer-events-none -z-20" />
       
       {/* Back button */}
-      <div className="absolute top-6 left-6 z-40">
+      <div className="w-full max-w-[1200px] mb-6 lg:absolute lg:top-8 lg:left-8 lg:mb-0 z-40">
         <button
           onClick={() => router.push("/")}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-foreground/80 hover:text-primary hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_15px_rgba(49,107,243,0.15)] transition-all cursor-pointer text-sm font-medium"

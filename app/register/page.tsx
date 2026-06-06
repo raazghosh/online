@@ -124,7 +124,7 @@ function RegisterPageContent() {
       setSubmitSuccess(true);
 
       setTimeout(() => {
-        router.push("/");
+        router.push("/onboarding");
       }, 1500);
     } catch (err: any) {
       setSubmitError(err?.message || "Registration process failed.");
@@ -157,7 +157,7 @@ function RegisterPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 select-none">
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 select-none">
       {/* Background Glow Elements */}
       <div className="absolute top-[10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/10 blur-[130px] animate-pulse-slow pointer-events-none -z-10" />
       <div className="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-accent/10 blur-[140px] pointer-events-none -z-10" />
@@ -166,7 +166,7 @@ function RegisterPageContent() {
       <div className="absolute inset-0 grid-bg opacity-[0.3] pointer-events-none -z-20" />
 
       {/* Back button */}
-      <div className="absolute top-6 left-6 z-40">
+      <div className="w-full max-w-[1200px] mb-6 lg:absolute lg:top-8 lg:left-8 lg:mb-0 z-40">
         <button
           onClick={() => router.push("/")}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-foreground/80 hover:text-primary hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_15px_rgba(49,107,243,0.15)] transition-all cursor-pointer text-sm font-medium"
@@ -631,15 +631,15 @@ function RegisterPageContent() {
                         <select
                           value={orgType}
                           onChange={(e) => setOrgType(e.target.value)}
-                          className="w-full h-12 pl-11 pr-10 rounded-xl bg-[#080c1c]/90 border border-white/10 text-foreground text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all appearance-none cursor-pointer"
+                          className="w-full h-12 pl-11 pr-10 rounded-xl bg-background border border-border text-foreground text-xs focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all appearance-none cursor-pointer"
                         >
-                          <option value="University">University</option>
-                          <option value="College">College</option>
-                          <option value="Company">Company</option>
-                          <option value="NGO">NGO</option>
-                          <option value="Government">Government</option>
-                          <option value="Society">Society</option>
-                          <option value="Other">Other</option>
+                          <option value="University" className="bg-background text-foreground">University</option>
+                          <option value="College" className="bg-background text-foreground">College</option>
+                          <option value="Company" className="bg-background text-foreground">Company</option>
+                          <option value="NGO" className="bg-background text-foreground">NGO</option>
+                          <option value="Government" className="bg-background text-foreground">Government</option>
+                          <option value="Society" className="bg-background text-foreground">Society</option>
+                          <option value="Other" className="bg-background text-foreground">Other</option>
                         </select>
                         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none">
                           <ChevronDown className="w-4 h-4" />

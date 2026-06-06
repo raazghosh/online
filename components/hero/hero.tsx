@@ -103,22 +103,22 @@ export function Hero() {
           <div className="absolute w-[180px] h-[180px] rounded-full bg-primary/20 blur-[60px] z-0" />
 
           {/* Orbiting Rings container */}
-          <div className="relative w-[340px] h-[340px] flex items-center justify-center">
+          <div className="relative w-[280px] h-[280px] sm:w-[340px] sm:h-[340px] flex items-center justify-center">
             
             {/* Outer Orbit Ring */}
             <div className="absolute inset-0 rounded-full border border-border/40 animate-orbit" />
 
             {/* Inner Orbit Ring */}
-            <div className="absolute w-[240px] h-[240px] rounded-full border border-border/60 animate-orbit-reverse" />
+            <div className="absolute w-[200px] h-[200px] sm:w-[240px] sm:h-[240px] rounded-full border border-border/60 animate-orbit-reverse" />
 
             {/* Center Conic Gradient Orb */}
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 25, ease: "linear", repeat: Infinity }}
-              className="absolute w-[140px] h-[140px] rounded-full bg-gradient-to-tr from-primary via-accent to-secondary p-[3px] shadow-[0_0_50px_rgba(49,107,243,0.4)]"
+              className="absolute w-[100px] h-[100px] sm:w-[140px] sm:h-[140px] rounded-full bg-gradient-to-tr from-primary via-accent to-secondary p-[3px] shadow-[0_0_50px_rgba(49,107,243,0.4)]"
             >
               <div className="w-full h-full rounded-full bg-[#050816] flex items-center justify-center">
-                <Shield className="w-10 h-10 text-primary" />
+                <Shield className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
               </div>
             </motion.div>
 
@@ -139,7 +139,7 @@ export function Hero() {
             initial={{ y: 20 }}
             animate={{ y: -15 }}
             transition={floatTransition}
-            className="absolute top-4 -left-12 sm:-left-4 z-20"
+            className="absolute top-4 left-0 sm:-left-4 lg:-left-12 z-20"
           >
             <div className="glassmorphism p-3.5 rounded-2xl border border-white/10 flex items-center gap-3 shadow-xl max-w-[170px]">
               <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center border border-green-500/20">
@@ -157,7 +157,7 @@ export function Hero() {
             initial={{ y: -10 }}
             animate={{ y: 15 }}
             transition={{ ...floatTransition, delay: 0.5 }}
-            className="absolute top-12 -right-12 sm:-right-4 z-20"
+            className="absolute top-12 right-0 sm:-right-4 lg:-right-12 z-20"
           >
             <div className="glassmorphism p-3.5 rounded-2xl border border-white/10 flex items-center gap-3 shadow-xl max-w-[180px]">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -175,7 +175,7 @@ export function Hero() {
             initial={{ y: -15 }}
             animate={{ y: 15 }}
             transition={{ ...floatTransition, delay: 1 }}
-            className="absolute bottom-8 -left-10 sm:-left-2 z-20"
+            className="absolute bottom-8 left-0 sm:-left-2 lg:-left-10 z-20"
           >
             <div className="glassmorphism p-3.5 rounded-2xl border border-white/10 flex items-center gap-3 shadow-xl max-w-[170px]">
               <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center border border-secondary/20">
@@ -193,7 +193,7 @@ export function Hero() {
             initial={{ y: 15 }}
             animate={{ y: -20 }}
             transition={{ ...floatTransition, delay: 1.5 }}
-            className="absolute bottom-4 -right-10 sm:-right-2 z-20"
+            className="absolute bottom-4 right-0 sm:-right-2 lg:-right-10 z-20"
           >
             <div className="glassmorphism p-3.5 rounded-2xl border border-white/10 flex items-center gap-3 shadow-xl max-w-[170px]">
               <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center border border-accent/20">
