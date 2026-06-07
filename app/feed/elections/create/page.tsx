@@ -17,9 +17,12 @@ import {
   ArrowLeft,
   Loader2,
   FileText,
-  UserCheck
+  UserCheck,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiCreatePoll } from "@/lib/api";
+import { useVotingStore } from "@/store/useVotingStore";
 
 interface Candidate {
   name: string;
@@ -29,6 +32,7 @@ interface Candidate {
 export default function CreateElectionPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Form states
   // Step 1: Details
@@ -77,15 +81,59 @@ export default function CreateElectionPage() {
     if (step > 1) setStep(prev => prev - 1);
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     setIsPublishing(true);
-    setTimeout(() => {
-      setIsPublishing(false);
+    setErrorMessage("");
+    try {
+      const options = candidates.map(c => c.name.trim()).filter(Boolean);
+      if (options.length < 2) {
+        throw new Error("An election must have at least two choices/candidates.");
+      }
+
+      let finalStart: string | undefined = undefined;
+      let finalEnd: string | undefined = undefined;
+
+      if (startDate) {
+        let startD = new Date(startDate);
+        const minStart = new Date(Date.now() + 15000); // 15s safety buffer
+        if (startD < minStart) {
+          startD = minStart;
+        }
+        finalStart = startD.toISOString();
+
+        if (endDate) {
+          let endD = new Date(endDate);
+          if (endD <= startD) {
+            endD = new Date(startD.getTime() + 60000); // Bump end to 1 minute after start if invalid
+          }
+          finalEnd = endD.toISOString();
+        }
+      }
+
+      const body = {
+        title,
+        description,
+        options,
+        allow_admin_vote: true, // Allow owner to cast votes/test
+        voting_start_at: finalStart,
+        voting_end_at: finalEnd,
+        auto_start: false,
+      };
+
+      const res = await apiCreatePoll(body);
+      
+      // Save to Zustand store
+      useVotingStore.getState().addCreatedPollId(res.poll.id);
+
       setPublishSuccess(true);
       setTimeout(() => {
         router.push("/feed/elections");
       }, 1500);
-    }, 3000);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to create election.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const stepLabels = [
@@ -115,6 +163,13 @@ export default function CreateElectionPage() {
         </h1>
         <p className="text-xs text-white/50">Setup ballot choices, list voters, and launch decentralized elections.</p>
       </div>
+
+      {errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 text-red-400 text-xs">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       {/* Progress indicators */}
       <div className="grid grid-cols-5 gap-2 text-center">

@@ -80,15 +80,15 @@ function LoginPageContent() {
     setSubmitStep(1);
 
     try {
-      // Local crypto steps
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Local crypto steps with real backend login in the middle
+      await new Promise(resolve => setTimeout(resolve, 600));
       setSubmitStep(2);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Real Login API Call
+      await login({ email, password, accountType });
+      
       setSubmitStep(3);
-      await new Promise(resolve => setTimeout(resolve, 700));
-
-      // Login store dispatch
-      login(email.split("@")[0] || "User", email);
+      await new Promise(resolve => setTimeout(resolve, 500));
       setSubmitSuccess(true);
       
       setTimeout(() => {
@@ -381,9 +381,10 @@ function LoginPageContent() {
                           <Mail className="w-5 h-5" />
                         </div>
                         <input
-                          type="text"
+                          type="email"
                           required
-                          placeholder="Email Address or Voter ID"
+                          autoComplete="email"
+                          placeholder="Email Address"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
@@ -397,6 +398,7 @@ function LoginPageContent() {
                         <input
                           type={showPassword ? "text" : "password"}
                           required
+                          autoComplete="current-password"
                           placeholder="Password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
@@ -448,9 +450,10 @@ function LoginPageContent() {
                           <Building className="w-5 h-5" />
                         </div>
                         <input
-                          type="text"
+                          type="email"
                           required
-                          placeholder="Organization ID or Official Email"
+                          autoComplete="email"
+                          placeholder="Organization Official Email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
@@ -464,6 +467,7 @@ function LoginPageContent() {
                         <input
                           type={showPassword ? "text" : "password"}
                           required
+                          autoComplete="current-password"
                           placeholder="Password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}

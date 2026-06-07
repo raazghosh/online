@@ -1,29 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building,
   CreditCard,
   History,
-  ShieldCheck,
   Zap,
-  Globe,
-  Settings,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useVotingStore } from "@/store/useVotingStore";
+import { apiGetMe, apiGetOrgMe } from "@/lib/api";
 
 export default function ProfilePage() {
-  const [orgDetails, setOrgDetails] = useState({
-    name: "SecureVote University Board",
-    id: "SV-UNI-4890",
-    type: "Educational Institution",
-    email: "board@securevote.edu",
-    status: "Verified"
-  });
+  const router = useRouter();
+  const { user, isInitialized } = useVotingStore();
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [activePlan, setActivePlan] = useState({
+  const [activePlan] = useState({
     name: "Enterprise Core",
     price: "$49 / month",
     billingCycle: "Billed monthly",
@@ -36,41 +35,105 @@ export default function ProfilePage() {
     { date: "Mar 04, 2026", invoice: "INV-2026-002", amount: "$49.00", status: "Paid" }
   ];
 
+  useEffect(() => {
+    if (isInitialized && !user) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchProfile = async () => {
+      setLoading(true);
+      try {
+        if (user?.role === "admin") {
+          const res = await apiGetOrgMe();
+          setProfileData(res);
+        } else if (user?.role === "voter") {
+          const res = await apiGetMe();
+          setProfileData(res);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isInitialized && user) {
+      fetchProfile();
+    }
+  }, [user, isInitialized, router]);
+
+  if (!isInitialized || loading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  const isAdmin = user?.role === "admin";
+  const displayName = isAdmin 
+    ? (profileData?.OrgName || "SecureVote Org")
+    : ((profileData?.FirstName && profileData?.LastName) 
+        ? `${profileData.FirstName} ${profileData.LastName}` 
+        : (user?.username || "Voter"));
+  const displayId = isAdmin
+    ? `SV-ORG-${profileData?.ID || "Pending"}`
+    : `SV-VOTER-${profileData?.ID || "Pending"}`;
+  const displayType = isAdmin
+    ? (profileData?.OrgType || "Educational Institution")
+    : (profileData?.IsTrusted ? "Trusted Voter" : "Standard Voter");
+  const displayEmail = profileData?.Email || user?.email || "";
+
   return (
     <div className="space-y-6 select-none">
       {/* Header */}
       <div className="border-b border-white/5 pb-5">
         <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-          <Building className="text-primary w-6 h-6" /> Organization Profile
+          {isAdmin ? (
+            <Building className="text-primary w-6 h-6" />
+          ) : (
+            <User className="text-primary w-6 h-6" />
+          )}
+          {isAdmin ? "Organization Profile" : "Personal Profile"}
         </h1>
-        <p className="text-xs text-white/50">Manage subscription, billing information, and institutional details.</p>
+        <p className="text-xs text-white/50">
+          {isAdmin 
+            ? "Manage subscription, billing information, and institutional details."
+            : "Manage subscription, billing information, and personal details."}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Org details & Subscription */}
+        {/* Org/User details & Subscription */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Org details */}
+          {/* Details */}
           <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Building className="w-4 h-4 text-primary" /> Institutional details
+              {isAdmin ? (
+                <Building className="w-4 h-4 text-primary" />
+              ) : (
+                <User className="w-4 h-4 text-primary" />
+              )}
+              {isAdmin ? "Institutional details" : "Personal details"}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="space-y-1">
-                <span className="text-white/40">Institution Name</span>
-                <p className="font-bold text-white">{orgDetails.name}</p>
+                <span className="text-white/40">{isAdmin ? "Institution Name" : "Full Name"}</span>
+                <p className="font-bold text-white">{displayName}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-white/40">Institution ID</span>
-                <p className="font-bold text-white font-mono">{orgDetails.id}</p>
+                <span className="text-white/40">{isAdmin ? "Institution ID" : "Voter ID"}</span>
+                <p className="font-bold text-white font-mono">{displayId}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-white/40">Category / Type</span>
-                <p className="font-bold text-white">{orgDetails.type}</p>
+                <span className="text-white/40">{isAdmin ? "Category / Type" : "Voter Tier"}</span>
+                <p className="font-bold text-white">{displayType}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-white/40">Official Contact Email</span>
-                <p className="font-bold text-white font-mono">{orgDetails.email}</p>
+                <span className="text-white/40">{isAdmin ? "Official Contact Email" : "Email Address"}</span>
+                <p className="font-bold text-white font-mono">{displayEmail}</p>
               </div>
             </div>
           </div>
@@ -134,7 +197,7 @@ export default function ProfilePage() {
               <p className="text-xs text-white/40 font-mono">{activePlan.price} • {activePlan.billingCycle}</p>
             </div>
 
-            <div className="border-t border-white/5 pt-4 space-y-2 text-xs text-white/70">
+            <div className="space-y-2 text-xs text-white/70">
               {activePlan.features.map((f, i) => (
                 <p key={i} className="flex items-start gap-2">
                   <span className="text-emerald-400 font-bold">✓</span>

@@ -23,7 +23,7 @@ interface TeamMember {
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([
-    { id: "m1", name: "Arnab (You)", email: "barnalichakrabarty8@gmail.com", role: "Owner", status: "active" },
+    { id: "m1", name: "You (Owner)", email: "owner@securevote.io", role: "Owner", status: "active" },
     { id: "m2", name: "Sarah Connor", email: "sarah@securevote.io", role: "Admin", status: "active" },
     { id: "m3", name: "John Doe", email: "john@securevote.io", role: "Election Manager", status: "active" },
     { id: "m4", name: "Kyle Reese", email: "kyle@securevote.io", role: "Viewer", status: "invited" }

@@ -1,4 +1,17 @@
 import { create } from "zustand";
+import {
+  apiGetMe,
+  apiGetOrgMe,
+  apiLogout,
+  apiRefresh,
+  decodeJwt,
+  loginIndividual,
+  loginOrganization,
+  registerIndividual,
+  registerOrganization,
+  setAccessToken,
+  registerAuthCallbacks,
+} from "@/lib/api";
 
 export interface AuditLog {
   id: string;
@@ -24,14 +37,30 @@ export interface UserSession {
   email: string;
   role: "admin" | "voter";
   isVerified: boolean;
+  emailVerified?: boolean;
+  firstName?: string;
+  lastName?: string;
+  orgName?: string;
+  phone?: string;
 }
 
 interface VotingState {
   // Authentication state
   user: UserSession | null;
-  login: (username: string, email: string) => void;
-  logout: () => void;
-  register: (username: string, email: string) => void;
+  accessToken: string | null;
+  isInitialized: boolean;
+  setAccessToken: (token: string | null) => void;
+  initializeSession: () => Promise<void>;
+  login: (payload: { email: string; password?: string; accountType: "individual" | "organization" }) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (payload: { email: string; password?: string; accountType: "individual" | "organization"; first_name?: string; last_name?: string; org_name?: string }) => Promise<void>;
+
+  // Local Poll tracking
+  createdPollIds: string[];
+  votedPollIds: string[];
+  addCreatedPollId: (pollId: string) => void;
+  addVotedPollId: (pollId: string) => void;
+  fetchPollIdsFromStorage: (email: string) => void;
 
   // Simulator steps: 0 = Idle, 1 = Verification, 2 = Encryption, 3 = Network Validation, 4 = Receipt
   simulatorStep: number;
@@ -67,27 +96,149 @@ interface VotingState {
   updateNodeLatency: (nodeId: string, latency: number) => void;
 }
 
-export const useVotingStore = create<VotingState>((set) => ({
+// ---- Shared helper: build UserSession from API profile ----
+async function buildUserDetails(
+  accountType: string
+): Promise<UserSession> {
+  if (accountType === "organization") {
+    const profile = await apiGetOrgMe();
+    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
+    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
+    return {
+      username: savedUsername || profile.OrgName || "Org Owner",
+      email: profile.Email,
+      role: "admin",
+      isVerified: profile.IsVerified,
+      orgName: profile.OrgName,
+      emailVerified: profile.EmailVerified,
+      phone: savedPhone || "",
+    };
+  } else {
+    const profile = await apiGetMe();
+    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
+    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
+    return {
+      username: savedUsername || `${profile.FirstName} ${profile.LastName}`.trim() || "Voter",
+      email: profile.Email,
+      role: "voter",
+      isVerified: profile.IsVerified,
+      firstName: profile.FirstName,
+      lastName: profile.LastName,
+      emailVerified: profile.EmailVerified,
+      phone: savedPhone || "",
+    };
+  }
+}
+// -----------------------------------------------------------
+
+export const useVotingStore = create<VotingState>((set, get) => ({
   user: null,
-  login: (username, email) =>
-    set({
-      user: {
-        username,
-        email,
-        role: email.includes("admin") ? "admin" : "voter",
-        isVerified: true,
-      },
-    }),
-  logout: () => set({ user: null }),
-  register: (username, email) =>
-    set({
-      user: {
-        username,
-        email,
-        role: "voter",
-        isVerified: false,
-      },
-    }),
+  accessToken: null,
+  isInitialized: false,
+  createdPollIds: [],
+  votedPollIds: [],
+
+  setAccessToken: (token) => {
+    set({ accessToken: token });
+    setAccessToken(token);
+  },
+
+  initializeSession: async () => {
+    try {
+      const token = await apiRefresh();
+      if (token) {
+        set({ accessToken: token });
+        const decoded = decodeJwt(token);
+        const accountType = decoded?.account_type;
+        const userDetails = await buildUserDetails(accountType);
+        set({ user: userDetails });
+        get().fetchPollIdsFromStorage(userDetails.email);
+      }
+    } catch (err) {
+      set({ user: null, accessToken: null });
+    } finally {
+      set({ isInitialized: true });
+    }
+  },
+
+  login: async ({ email, password, accountType }) => {
+    let tokenData;
+    if (accountType === "organization") {
+      tokenData = await loginOrganization({ email, password });
+    } else {
+      tokenData = await loginIndividual({ email, password });
+    }
+
+    if (tokenData && tokenData.access_token) {
+      set({ accessToken: tokenData.access_token });
+      const decoded = decodeJwt(tokenData.access_token);
+      const userDetails = await buildUserDetails(decoded?.account_type);
+      set({ user: userDetails });
+      get().fetchPollIdsFromStorage(userDetails.email);
+    }
+  },
+
+  logout: async () => {
+    try {
+      await apiLogout();
+    } catch (err) {
+      // Ignore API errors
+    } finally {
+      set({ user: null, accessToken: null, createdPollIds: [], votedPollIds: [] });
+    }
+  },
+
+  register: async (payload) => {
+    if (payload.accountType === "organization") {
+      await registerOrganization({
+        org_name: payload.org_name,
+        email: payload.email,
+        password: payload.password,
+      });
+    } else {
+      await registerIndividual({
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        email: payload.email,
+        password: payload.password,
+      });
+    }
+  },
+
+  addCreatedPollId: (pollId) => {
+    const userEmail = get().user?.email;
+    if (!userEmail) return;
+    const current = get().createdPollIds;
+    if (!current.includes(pollId)) {
+      const updated = [...current, pollId];
+      set({ createdPollIds: updated });
+      localStorage.setItem(`created_polls_${userEmail}`, JSON.stringify(updated));
+    }
+  },
+
+  addVotedPollId: (pollId) => {
+    const userEmail = get().user?.email;
+    if (!userEmail) return;
+    const current = get().votedPollIds;
+    if (!current.includes(pollId)) {
+      const updated = [...current, pollId];
+      set({ votedPollIds: updated });
+      localStorage.setItem(`voted_polls_${userEmail}`, JSON.stringify(updated));
+    }
+  },
+
+  fetchPollIdsFromStorage: (email) => {
+    try {
+      const createdStr = localStorage.getItem(`created_polls_${email}`);
+      const votedStr = localStorage.getItem(`voted_polls_${email}`);
+      set({
+        createdPollIds: createdStr ? JSON.parse(createdStr) : [],
+        votedPollIds: votedStr ? JSON.parse(votedStr) : [],
+      });
+    } catch {
+      set({ createdPollIds: [], votedPollIds: [] });
+    }
+  },
 
   simulatorStep: 0,
   setSimulatorStep: (step) => set({ simulatorStep: step }),
@@ -218,3 +369,14 @@ export const useVotingStore = create<VotingState>((set) => ({
       ),
     })),
 }));
+
+// Register auth callbacks to receive state changes from the API client without circular imports
+registerAuthCallbacks({
+  onTokenRefreshed: (token) => {
+    useVotingStore.setState({ accessToken: token });
+  },
+  onAuthFailure: () => {
+    useVotingStore.setState({ user: null, accessToken: null, createdPollIds: [], votedPollIds: [] });
+  },
+});
+

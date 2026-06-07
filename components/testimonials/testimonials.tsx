@@ -83,7 +83,7 @@ export function Testimonials() {
 
                 {/* Quote */}
                 <p className="text-sm text-foreground/75 leading-relaxed font-medium italic">
-                  "{test.quote}"
+                  &ldquo;{test.quote}&rdquo;
                 </p>
 
                 {/* Author Info */}

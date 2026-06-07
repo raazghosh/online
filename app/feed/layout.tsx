@@ -71,7 +71,6 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
     { label: "Settings", href: "/feed/settings", icon: Settings },
   ];
 
-  if (!mounted) return null;
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -288,7 +287,11 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
               className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer text-white/80"
               title="Toggle Theme"
             >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {mounted ? (
+                theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
+              ) : (
+                <Sun className="w-4 h-4" />
+              )}
             </button>
 
             {/* Notifications Dropdown */}

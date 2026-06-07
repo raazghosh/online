@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Settings,
   Lock,
@@ -13,14 +14,17 @@ import {
   AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useVotingStore } from "@/store/useVotingStore";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user, isInitialized } = useVotingStore();
   const [activeTab, setActiveTab] = useState<"account" | "security" | "notifications">("account");
 
   // Account form states
-  const [email, setEmail] = useState("barnalichakrabarty8@gmail.com");
-  const [username, setUsername] = useState("Arnab");
-  const [phone, setPhone] = useState("+91 98765 43210");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Security states
@@ -35,8 +39,25 @@ export default function SettingsPage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
 
+  useEffect(() => {
+    if (isInitialized && !user) {
+      router.push("/login");
+      return;
+    }
+    if (user) {
+      setEmail(user.email);
+      setUsername(user.username);
+      setPhone(user.phone || "");
+    }
+  }, [user, isInitialized, router]);
+
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Persist username and phone keyed by the current user's email
+    if (user?.email) {
+      localStorage.setItem(`username_${user.email}`, username);
+      localStorage.setItem(`phone_${user.email}`, phone);
+    }
     setSuccessMsg("Account profile updated successfully.");
     setTimeout(() => setSuccessMsg(""), 3000);
   };
@@ -46,6 +67,14 @@ export default function SettingsPage() {
     setSuccessMsg("Security configuration updated.");
     setTimeout(() => setSuccessMsg(""), 3000);
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 select-none relative">

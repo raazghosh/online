@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -13,67 +13,105 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
+import {
+  apiGetPoll,
+  apiGetResults,
+  apiCreatePoll,
+  apiEndPoll,
+  apiDeletePoll,
+  apiCastVote
+} from "@/lib/api";
 
-interface Poll {
+interface OptionTally {
+  label: string;
+  votes: number;
+}
+
+interface UIInstancePoll {
   id: string;
   question: string;
   category: string;
   status: "active" | "closed";
-  options: { label: string; votes: number }[];
+  options: OptionTally[];
   endDate: string;
 }
 
 export default function PollsPage() {
   const router = useRouter();
+  const { user, createdPollIds, votedPollIds } = useVotingStore();
 
-  // Mock Polls
-  const [polls, setPolls] = useState<Poll[]>([
-    {
-      id: "p1",
-      question: "Which office working model do you prefer?",
-      category: "Workplace",
-      status: "active",
-      options: [
-        { label: "Fully Remote", votes: 45 },
-        { label: "Hybrid (2-3 days office)", votes: 92 },
-        { label: "Fully Onsite", votes: 14 }
-      ],
-      endDate: "2026-06-15"
-    },
-    {
-      id: "p2",
-      question: "Choose the theme color for our new voting simulator dashboard.",
-      category: "Design",
-      status: "active",
-      options: [
-        { label: "Cyberpunk Glow", votes: 68 },
-        { label: "Glassmorphism Dark", votes: 112 },
-        { label: "Minimalist Light", votes: 24 }
-      ],
-      endDate: "2026-06-08"
-    },
-    {
-      id: "p3",
-      question: "Approval for the Q3 corporate budget allocations.",
-      category: "Finance",
-      status: "closed",
-      options: [
-        { label: "Approve", votes: 154 },
-        { label: "Disapprove", votes: 22 },
-        { label: "Abstain", votes: 12 }
-      ],
-      endDate: "2026-05-30"
-    }
-  ]);
+  const [polls, setPolls] = useState<UIInstancePoll[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Create poll fields
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
   const [newCategory, setNewCategory] = useState("Workplace");
   const [newOptions, setNewOptions] = useState<string[]>(["", ""]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadPolls = React.useCallback(async () => {
+    setLoading(true);
+    setErrorMessage("");
+    const uniquePollIds = Array.from(new Set([...createdPollIds, ...votedPollIds]));
+    if (uniquePollIds.length === 0) {
+      setPolls([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const promises = uniquePollIds.map(async (id) => {
+        try {
+          const data = await apiGetPoll(id);
+          let resultsData = null;
+          try {
+            resultsData = await apiGetResults(id);
+          } catch {
+            // Ignore results fetch failure if poll has not ended or no votes cast
+          }
+
+          const formattedOptions = (data.options || []).map((opt: string) => ({
+            label: opt,
+            votes: resultsData?.votes?.[opt] || 0,
+          }));
+
+          return {
+            id: data.id,
+            question: data.title,
+            category: data.description && data.description.startsWith("Category: ")
+              ? data.description.replace("Category: ", "")
+              : "General",
+            status: data.status === "active" ? ("active" as const) : ("closed" as const),
+            options: formattedOptions,
+            endDate: data.voting_end_at ? new Date(data.voting_end_at).toLocaleDateString() : "Manual Close",
+          };
+        } catch {
+          return null; // Skip if deleted
+        }
+      });
+
+      const results = await Promise.all(promises);
+      setPolls(results.filter((p) => p !== null) as UIInstancePoll[]);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to load polls.");
+    } finally {
+      setLoading(false);
+    }
+  }, [createdPollIds, votedPollIds]);
+
+  useEffect(() => {
+    if (user) {
+      loadPolls();
+    }
+  }, [user, loadPolls]);
 
   const handleOptionChange = (idx: number, val: string) => {
     const updated = [...newOptions];
@@ -89,37 +127,98 @@ export default function PollsPage() {
     setNewOptions(newOptions.filter((_, i) => i !== idx));
   };
 
-  const handleCreatePollSubmit = (e: React.FormEvent) => {
+  const handleCreatePollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newQuestion || newOptions.filter(o => o).length < 2) return;
+    const cleanOptions = newOptions.filter((o) => o.trim());
+    if (!newQuestion || cleanOptions.length < 2) return;
 
-    const formattedOptions = newOptions
-      .filter(o => o)
-      .map(o => ({ label: o, votes: 0 }));
+    setSubmitting(true);
+    setErrorMessage("");
+    try {
+      const body = {
+        title: newQuestion,
+        description: `Category: ${newCategory}`,
+        options: cleanOptions,
+        allow_admin_vote: true,
+        auto_start: true, // Start immediately for instant polls
+        duration_minutes: 10080, // Run for 7 days
+      };
 
-    const newPoll: Poll = {
-      id: `p_${Date.now()}`,
-      question: newQuestion,
-      category: newCategory,
-      status: "active",
-      options: formattedOptions,
-      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-    };
+      const res = await apiCreatePoll(body);
+      
+      // Save created poll ID to store
+      useVotingStore.getState().addCreatedPollId(res.poll.id);
 
-    setPolls([newPoll, ...polls]);
-    setShowCreateModal(false);
-    setNewQuestion("");
-    setNewOptions(["", ""]);
+      setShowCreateModal(false);
+      setNewQuestion("");
+      setNewOptions(["", ""]);
+      await loadPolls();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to launch instant poll.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleClosePoll = (id: string) => {
-    setPolls(prev =>
-      prev.map(p => (p.id === id ? { ...p, status: "closed" as const } : p))
-    );
+  const handleClosePoll = async (id: string) => {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      await apiEndPoll(id);
+      await loadPolls();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to close poll.");
+      setLoading(false);
+    }
   };
 
-  const handleDeletePoll = (id: string) => {
-    setPolls(prev => prev.filter(p => p.id !== id));
+  const handleVote = async (pollId: string, optionIdx: number) => {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      await apiCastVote(pollId, optionIdx);
+      useVotingStore.getState().addVotedPollId(pollId);
+      await loadPolls();
+      alert("Vote cast successfully!");
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to cast vote.");
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePoll = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this poll?")) return;
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      await apiDeletePoll(id);
+      
+      // Clean up locally stored ID references
+      const userEmail = user?.email;
+      if (userEmail) {
+        const createdStr = localStorage.getItem(`created_polls_${userEmail}`);
+        if (createdStr) {
+          const arr = JSON.parse(createdStr).filter((pid: string) => pid !== id);
+          localStorage.setItem(`created_polls_${userEmail}`, JSON.stringify(arr));
+        }
+        const votedStr = localStorage.getItem(`voted_polls_${userEmail}`);
+        if (votedStr) {
+          const arr = JSON.parse(votedStr).filter((pid: string) => pid !== id);
+          localStorage.setItem(`voted_polls_${userEmail}`, JSON.stringify(arr));
+        }
+      }
+
+      // Update Zustand state directly and refresh the list
+      useVotingStore.setState((state) => ({
+        createdPollIds: state.createdPollIds.filter((pid) => pid !== id),
+        votedPollIds: state.votedPollIds.filter((pid) => pid !== id),
+      }));
+      setPolls((prev) => prev.filter((p) => p.id !== id));
+      setLoading(false);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to delete poll.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -141,89 +240,120 @@ export default function PollsPage() {
         </Button>
       </div>
 
+      {errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 text-red-400 text-xs">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       {/* Poll list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {polls.map((poll) => {
-          const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
+      {loading && polls.length === 0 ? (
+        <div className="min-h-[200px] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : polls.length === 0 ? (
+        <div className="border border-white/5 rounded-3xl p-12 text-center bg-white/[0.01] space-y-4">
+          <BarChart3 className="w-12 h-12 text-white/20 mx-auto" />
+          <h3 className="text-base font-bold text-white">No Polls Found</h3>
+          <p className="text-xs text-white/40 max-w-sm mx-auto">
+            We couldn&apos;t find any polls under your account. Launch an instant poll to get started!
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {polls.map((poll) => {
+            const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
+            const canVote = poll.status === "active" && !votedPollIds.includes(poll.id);
 
-          return (
-            <div
-              key={poll.id}
-              className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-6 hover:border-white/15 transition-all"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-white/60 border border-white/5 font-bold uppercase tracking-wider">
-                    {poll.category}
-                  </span>
-                  <span
-                    className={`text-[8px] px-2 py-0.5 rounded font-black uppercase ${
-                      poll.status === "active"
-                        ? "bg-primary/20 text-primary border border-primary/25"
-                        : "bg-white/5 text-white/40 border border-white/5"
-                    }`}
-                  >
-                    {poll.status}
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-white leading-snug">{poll.question}</h3>
-              </div>
-
-              {/* Options details */}
-              <div className="space-y-3">
-                {poll.options.map((opt, idx) => {
-                  const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                  return (
-                    <div key={idx} className="space-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-white/80">{opt.label}</span>
-                        <span className="text-white/40 font-mono">{opt.votes} votes ({pct}%)</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Footer info & operations */}
-              <div className="flex items-center justify-between border-t border-white/5 pt-4 text-[10px] text-white/40">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-primary" /> Ends: {poll.endDate}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  {poll.status === "active" ? (
-                    <button
-                      onClick={() => handleClosePoll(poll.id)}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/20 text-amber-400 font-bold transition-all cursor-pointer"
+            return (
+              <div
+                key={poll.id}
+                className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-6 hover:border-white/15 transition-all"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-white/60 border border-white/5 font-bold uppercase tracking-wider">
+                      {poll.category}
+                    </span>
+                    <span
+                      className={`text-[8px] px-2 py-0.5 rounded font-black uppercase border ${
+                        poll.status === "active"
+                          ? "bg-primary/20 text-primary border-primary/25"
+                          : "bg-white/5 text-white/40 border-white/5"
+                      }`}
                     >
-                      Close Poll
-                    </button>
-                  ) : (
+                      {poll.status}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-white leading-snug">{poll.question}</h3>
+                </div>
+
+                <div className="space-y-3">
+                  {poll.options.map((opt, idx) => {
+                    const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+                    return (
+                      <div key={idx} className="space-y-1 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/80">{opt.label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white/40 font-mono">{opt.votes} votes ({pct}%)</span>
+                            {canVote && (
+                              <button
+                                onClick={() => handleVote(poll.id, idx)}
+                                className="px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-all cursor-pointer"
+                              >
+                                Vote
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer info & operations */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-4 text-[10px] text-white/40">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-primary" /> Ends: {poll.endDate}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {poll.status === "active" ? (
+                      <button
+                        onClick={() => handleClosePoll(poll.id)}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/20 text-amber-400 font-bold transition-all cursor-pointer text-[9px] uppercase tracking-wider"
+                      >
+                        Close Poll
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/feed/results?pollId=${poll.id}`)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/15 hover:bg-emerald-500/20 text-emerald-400 font-bold transition-all cursor-pointer flex items-center gap-1 text-[9px] uppercase tracking-wider"
+                      >
+                        <Download className="w-3 h-3" /> Results
+                      </button>
+                    )}
                     <button
-                      onClick={() => router.push("/feed/results")}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/15 hover:bg-emerald-500/20 text-emerald-400 font-bold transition-all cursor-pointer flex items-center gap-1"
+                      onClick={() => handleDeletePoll(poll.id)}
+                      className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/15 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
                     >
-                      <Download className="w-3 h-3" /> Export
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDeletePoll(poll.id)}
-                    className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/15 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal: Create Instant Poll */}
       {showCreateModal && (
@@ -317,8 +447,10 @@ export default function PollsPage() {
                 </button>
                 <Button
                   type="submit"
+                  disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:shadow-[0_0_20px_rgba(49,107,243,0.3)] transition-all"
                 >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5 inline-block" /> : null}
                   Launch Instant Poll
                 </Button>
               </div>

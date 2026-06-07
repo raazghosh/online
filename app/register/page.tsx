@@ -108,23 +108,37 @@ function RegisterPageContent() {
     setSubmitStep(1);
 
     try {
-      // Local crypto steps
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Local crypto steps with real backend registration in the middle
+      await new Promise(resolve => setTimeout(resolve, 600));
       setSubmitStep(2);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSubmitStep(3);
-      await new Promise(resolve => setTimeout(resolve, 700));
 
-      // Register store dispatch
+      // Real API call
       if (accountType === "individual") {
-        register(fullName, email);
+        const parts = fullName.trim().split(/\s+/);
+        const first_name = parts[0] || "";
+        const last_name = parts.slice(1).join(" ") || ".";
+        await register({
+          accountType,
+          first_name,
+          last_name,
+          email,
+          password
+        });
       } else {
-        register(orgName, orgEmail);
+        await register({
+          accountType,
+          org_name: orgName,
+          email: orgEmail,
+          password
+        });
       }
+
+      setSubmitStep(3);
+      await new Promise(resolve => setTimeout(resolve, 500));
       setSubmitSuccess(true);
 
       setTimeout(() => {
-        router.push("/onboarding");
+        router.push("/login");
       }, 1500);
     } catch (err: any) {
       setSubmitError(err?.message || "Registration process failed.");
@@ -427,6 +441,7 @@ function RegisterPageContent() {
                         <input
                           type="email"
                           required
+                          autoComplete="email"
                           placeholder="Email Address"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
@@ -482,6 +497,7 @@ function RegisterPageContent() {
                         <input
                           type={showPassword ? "text" : "password"}
                           required
+                          autoComplete="new-password"
                           placeholder="Password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
@@ -503,6 +519,7 @@ function RegisterPageContent() {
                         <input
                           type={showConfirmPassword ? "text" : "password"}
                           required
+                          autoComplete="new-password"
                           placeholder="Confirm Password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
