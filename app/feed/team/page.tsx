@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVotingStore } from "@/store/useVotingStore";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import {
   apiGetTeams,
   apiCreateTeam,
@@ -233,6 +234,10 @@ export default function TeamPage() {
                             <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/5 uppercase font-bold tracking-wider">
                               Invited
                             </span>
+                          )}
+                          {/* Show verified badge if this member email matches the current logged-in user and they are verified */}
+                          {member.email === user?.email && user?.isVerified && (
+                            <VerifiedBadge isVerified={true} size="xs" />
                           )}
                         </div>
                         <p className="text-[10px] text-white/40 font-mono">{member.email}</p>

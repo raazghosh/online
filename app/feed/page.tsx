@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
-import { apiGetPoll, apiGetResults } from "@/lib/api";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { apiGetPoll, apiGetResults, apiGetPolls } from "@/lib/api";
 
 export default function FeedDashboard() {
   const router = useRouter();
@@ -51,67 +52,73 @@ export default function FeedDashboard() {
 
     const loadPolls = async () => {
       setLoading(true);
-      const uniquePollIds = Array.from(new Set([...createdPollIds, ...votedPollIds]));
-      if (uniquePollIds.length === 0) {
-        setElections([]);
-        setLoading(false);
-        return;
-      }
-
       try {
-        const promises = uniquePollIds.map(async (id) => {
+        const res = await apiGetPolls({ scope: "feed", limit: 20 });
+        const list = res.data || [];
+        
+        // Step 1: Set basic poll info instantly to render listing immediately
+        const initialElections = list.map((poll: any) => ({
+          id: poll.id,
+          name: poll.title,
+          status: poll.status === "active" ? "Active" : poll.status === "ended" ? "Completed" : "Scheduled",
+          votes: null,
+          totalVoters: null,
+          endDate: poll.voting_end_at ? new Date(poll.voting_end_at).toLocaleDateString() : "Manual",
+        }));
+        setElections(initialElections);
+        setLoading(false);
+
+        // Step 2: Query details and results in the background
+        const promises = list.map(async (poll: any) => {
+          let votes = 0;
+          let totalVoters = 0;
           try {
-            const data = await apiGetPoll(id);
-            let resultsData = null;
-            try {
-              resultsData = await apiGetResults(id);
-            } catch {
-              // Ignore results fetch failure if poll has not ended or no votes cast
-            }
-            return {
-              id: data.id,
-              name: data.title,
-              status: data.status === "active" ? "Active" : data.status === "ended" ? "Completed" : "Scheduled",
-              votes: resultsData?.total_votes || 0,
-              totalVoters: data.options ? data.options.length * 100 : 0, // Mock total voter pool representation
-              endDate: data.voting_end_at ? new Date(data.voting_end_at).toLocaleDateString() : "Manual",
-            };
-          } catch {
-            return null; // Skip if poll does not exist
-          }
+            const resultsData = await apiGetResults(poll.id);
+            votes = resultsData?.total_votes || 0;
+          } catch {}
+          try {
+            const details = await apiGetPoll(poll.id);
+            totalVoters = details.options ? details.options.length * 100 : 0;
+          } catch {}
+          return { id: poll.id, votes, totalVoters };
         });
 
-        const results = await Promise.all(promises);
-        setElections(results.filter((e) => e !== null) as any[]);
+        const bgData = await Promise.all(promises);
+
+        // Step 3: Populate options/votes dynamically
+        setElections((prev) =>
+          prev.map((item) => {
+            const bgItem = bgData.find((d) => d.id === item.id);
+            if (bgItem) {
+              return {
+                ...item,
+                votes: bgItem.votes,
+                totalVoters: bgItem.totalVoters,
+              };
+            }
+            return item;
+          })
+        );
       } catch {
-        // Silent error
-      } finally {
         setLoading(false);
       }
     };
 
     loadPolls();
-  }, [isInitialized, user, createdPollIds, votedPollIds]);
+  }, [isInitialized, user]);
 
   if (!mounted) return null;
 
-  if (loading && elections.length === 0) {
-    return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-      </div>
-    );
-  }
-
   const activeElections = elections.filter((e) => e.status === "Active").length;
-  const totalVotesCast = elections.reduce((sum, e) => sum + e.votes, 0);
-  const totalVotersPool = elections.reduce((sum, e) => sum + e.totalVoters, 0);
+  const totalVotesCast = elections.reduce((sum, e) => sum + (e.votes || 0), 0);
+  const totalVotersPool = elections.reduce((sum, e) => sum + (e.totalVoters || 0), 0);
+  const bgLoading = elections.length > 0 && elections.some((e) => e.votes === null);
 
   return (
     <div className="space-y-8 select-none">
       {/* Welcome Card & Info Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8 backdrop-blur-md relative overflow-hidden flex flex-col justify-between group hover:border-white/15 transition-all">
+        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 md:p-8 backdrop-blur-md relative overflow-hidden flex flex-col justify-between group hover:border-border/80 transition-all">
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-[60px] pointer-events-none -z-10 group-hover:scale-110 transition-transform duration-500" />
           <div className="space-y-4">
             {user?.isVerified ? (
@@ -129,26 +136,39 @@ export default function FeedDashboard() {
               </button>
             )}
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
                 Welcome back, <span className="text-primary">{user?.username || "Voter"}</span>
               </h1>
-              <p className="text-sm text-white/50 mt-1 max-w-md">
+              {user?.isVerified && (
+                <div className="mt-2">
+                  <VerifiedBadge isVerified={user.isVerified} size="sm" />
+                </div>
+              )}
+              <p className="text-sm text-foreground/50 mt-2 max-w-md">
                 Your dashboard is synchronized with 6 validator nodes. All cast ballots are end-to-end encrypted.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-8">
+          <div className="grid grid-cols-3 gap-4 border-t border-border pt-6 mt-8">
             <div>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Active Elections</p>
-              <p className="text-xl font-black text-white mt-1">{activeElections}</p>
+              <p className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest">Active Elections</p>
+              {loading ? (
+                <div className="h-6 w-10 bg-foreground/10 rounded animate-pulse mt-1" />
+              ) : (
+                <p className="text-xl font-black text-foreground mt-1">{activeElections}</p>
+              )}
             </div>
             <div>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Total Votes Cast</p>
-              <p className="text-xl font-black text-white mt-1">{totalVotesCast}</p>
+              <p className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest">Total Votes Cast</p>
+              {loading || bgLoading ? (
+                <div className="h-6 w-12 bg-foreground/10 rounded animate-pulse mt-1" />
+              ) : (
+                <p className="text-xl font-black text-foreground mt-1">{totalVotesCast}</p>
+              )}
             </div>
             <div>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Global Status</p>
+              <p className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest">Global Status</p>
               <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 text-[10px] font-bold mt-1 uppercase">
                 Synced
               </span>
@@ -157,45 +177,45 @@ export default function FeedDashboard() {
         </div>
 
         {/* Quick Actions Panel */}
-        <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md flex flex-col justify-between hover:border-white/15 transition-all">
+        <div className="lg:col-span-4 bg-card border border-border rounded-3xl p-6 backdrop-blur-md flex flex-col justify-between hover:border-border/80 transition-all">
           <div>
-            <h2 className="text-sm font-bold tracking-wider text-white/60 uppercase">Quick Actions</h2>
+            <h2 className="text-sm font-bold tracking-wider text-foreground/60 uppercase">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-3 mt-4">
               <button
                 onClick={() => router.push("/feed/elections/create")}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-surface border border-border hover:bg-foreground/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer text-foreground"
               >
-                <PlusCircle className="w-5 h-5 text-white/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+                <PlusCircle className="w-5 h-5 text-foreground/60 group-hover:text-primary group-hover:scale-110 transition-all" />
                 <span className="text-xs font-semibold">New Election</span>
               </button>
 
               <button
                 onClick={() => router.push("/feed/elections")}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-surface border border-border hover:bg-foreground/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer text-foreground"
               >
-                <Upload className="w-5 h-5 text-white/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+                <Upload className="w-5 h-5 text-foreground/60 group-hover:text-primary group-hover:scale-110 transition-all" />
                 <span className="text-xs font-semibold">Import Poll</span>
               </button>
 
               <button
                 onClick={() => router.push("/feed/polls")}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-surface border border-border hover:bg-foreground/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer text-foreground"
               >
-                <UserPlus className="w-5 h-5 text-white/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+                <UserPlus className="w-5 h-5 text-foreground/60 group-hover:text-primary group-hover:scale-110 transition-all" />
                 <span className="text-xs font-semibold">Instant Polls</span>
               </button>
 
               <button
                 onClick={() => router.push("/feed/results")}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-surface border border-border hover:bg-foreground/10 hover:border-primary/20 hover:text-primary transition-all text-center gap-2 group cursor-pointer text-foreground"
               >
-                <Download className="w-5 h-5 text-white/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+                <Download className="w-5 h-5 text-foreground/60 group-hover:text-primary group-hover:scale-110 transition-all" />
                 <span className="text-xs font-semibold">Get Results</span>
               </button>
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-white/5 text-center">
+          <div className="mt-4 pt-4 border-t border-border text-center">
             <button
               onClick={() => router.push("/feed/verification")}
               className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
@@ -209,23 +229,27 @@ export default function FeedDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: "Total Elections", val: elections.length.toString(), diff: "Registered polls", icon: Vote, color: "text-primary" },
-          { label: "Total Options", val: totalVotersPool ? (totalVotersPool / 100).toString() : "0", diff: "Choices active", icon: Users, color: "text-accent" },
-          { label: "Votes Cast", val: totalVotesCast.toLocaleString(), diff: "Aggregated results", icon: CheckSquare, color: "text-emerald-400" },
-          { label: "Active Elections", val: activeElections.toString(), diff: "Accepting ballots", icon: Activity, color: "text-amber-400" },
+          { label: "Total Elections", val: loading ? null : elections.length.toString(), diff: "Registered polls", icon: Vote, color: "text-primary" },
+          { label: "Total Options", val: (loading || bgLoading) ? null : (totalVotersPool ? (totalVotersPool / 100).toString() : "0"), diff: "Choices active", icon: Users, color: "text-accent" },
+          { label: "Votes Cast", val: (loading || bgLoading) ? null : totalVotesCast.toLocaleString(), diff: "Aggregated results", icon: CheckSquare, color: "text-emerald-400" },
+          { label: "Active Elections", val: loading ? null : activeElections.toString(), diff: "Accepting ballots", icon: Activity, color: "text-amber-400" },
         ].map((stat, i) => {
           const Icon = stat.icon;
           return (
             <div
               key={i}
-              className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm flex items-center justify-between group hover:border-white/15 transition-all"
+              className="bg-card border border-border rounded-2xl p-5 backdrop-blur-sm flex items-center justify-between group hover:border-border/80 transition-all"
             >
               <div className="space-y-1">
-                <span className="text-xs text-white/40 font-semibold">{stat.label}</span>
-                <p className="text-2xl font-black text-white">{stat.val}</p>
-                <span className="text-[10px] text-white/40 block">{stat.diff}</span>
+                <span className="text-xs text-foreground/40 font-semibold">{stat.label}</span>
+                {stat.val === null ? (
+                  <div className="h-8 w-16 bg-foreground/10 rounded-lg animate-pulse mt-1" />
+                ) : (
+                  <p className="text-2xl font-black text-foreground">{stat.val}</p>
+                )}
+                <span className="text-[10px] text-foreground/40 block">{stat.diff}</span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-white/10 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center border border-border group-hover:border-border/80 transition-all">
                 <Icon className={`w-5 h-5 ${stat.color}`} />
               </div>
             </div>
@@ -236,11 +260,11 @@ export default function FeedDashboard() {
       {/* Recent Elections Feed & Analytics Widget */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Elections Feed */}
-        <div className="lg:col-span-8 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md space-y-6">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 backdrop-blur-md space-y-6">
+          <div className="flex items-center justify-between border-b border-border pb-4">
             <div>
-              <h2 className="text-lg font-bold text-white">Recent Elections Feed</h2>
-              <p className="text-xs text-white/40">Track and manage active or completed digital polls.</p>
+              <h2 className="text-lg font-bold text-foreground">Recent Elections Feed</h2>
+              <p className="text-xs text-foreground/40">Track and manage active or completed digital polls.</p>
             </div>
             <button
               onClick={() => router.push("/feed/elections")}
@@ -251,8 +275,27 @@ export default function FeedDashboard() {
           </div>
 
           <div className="space-y-4">
-            {elections.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-white/10 rounded-2xl text-xs text-white/40 space-y-2">
+            {loading && elections.length === 0 ? (
+              Array.from({ length: 3 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-foreground/[0.02] border border-border gap-4 animate-pulse"
+                >
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-foreground/10 rounded w-2/3" />
+                    <div className="flex gap-3">
+                      <div className="h-3 bg-foreground/5 rounded w-16" />
+                      <div className="h-3 bg-foreground/5 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-24 bg-foreground/5 rounded-xl" />
+                    <div className="h-8 w-8 bg-foreground/5 rounded-xl" />
+                  </div>
+                </div>
+              ))
+            ) : elections.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-border rounded-2xl text-xs text-foreground/40 space-y-2">
                 <p>No active or registered polls found.</p>
                 <Button
                   onClick={() => router.push("/feed/elections/create")}
@@ -265,26 +308,28 @@ export default function FeedDashboard() {
               elections.map((elec) => (
                 <div
                   key={elec.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all gap-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-foreground/[0.02] border border-border hover:bg-foreground/[0.04] transition-all gap-4"
                 >
                   <div className="space-y-1.5 max-w-sm">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-xs font-bold text-white truncate">{elec.name}</h3>
+                      <h3 className="text-xs font-bold text-foreground truncate">{elec.name}</h3>
                       <span
                         className={`text-[8px] px-2 py-0.5 rounded font-black uppercase shrink-0 ${
                           elec.status === "Active"
                             ? "bg-primary/20 text-primary border border-primary/25"
                             : elec.status === "Completed"
                             ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/25"
-                            : "bg-white/5 text-white/50 border border-white/5"
+                            : "bg-surface text-foreground/50 border border-border"
                         }`}
                       >
                         {elec.status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] text-white/40 font-mono">
+                    <div className="flex items-center gap-3 text-[10px] text-foreground/40 font-mono">
                       <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" /> Votes: {elec.votes}
+                        <Users className="w-3 h-3" /> Votes: {elec.votes === null ? (
+                          <span className="inline-block w-8 h-3 bg-foreground/10 rounded animate-pulse mt-0.5 align-middle" />
+                        ) : elec.votes}
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" /> End: {elec.endDate}
@@ -295,7 +340,7 @@ export default function FeedDashboard() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => router.push(elec.status === "Completed" ? `/feed/results?pollId=${elec.id}` : `/feed/elections?pollId=${elec.id}`)}
-                      className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-xs font-bold transition-all cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-surface border border-border hover:bg-foreground/10 text-xs font-bold text-foreground transition-all cursor-pointer"
                     >
                       {elec.status === "Completed" ? "View Results" : "Manage"}
                     </button>
@@ -316,15 +361,15 @@ export default function FeedDashboard() {
         {/* Side Widget: Turnout Analytics & Notification Log */}
         <div className="lg:col-span-4 space-y-6">
           {/* Turnout Widget */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md hover:border-white/15 transition-all">
-            <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider flex items-center justify-between">
+          <div className="bg-card border border-border rounded-3xl p-6 backdrop-blur-md hover:border-border/80 transition-all">
+            <h3 className="text-xs font-bold text-foreground/60 uppercase tracking-wider flex items-center justify-between">
               <span>Turnout Trend</span>
               <TrendingUp className="w-4 h-4 text-emerald-400" />
             </h3>
 
             {/* Turnout percentage graph mock */}
             <div className="mt-4 space-y-4">
-              <div className="flex items-end justify-between h-20 px-2 pt-2 border-b border-white/5">
+              <div className="flex items-end justify-between h-20 px-2 pt-2 border-b border-border">
                 {[45, 60, 52, 78, 84, 70, 92].map((val, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-1.5 w-full">
                     <div
@@ -334,7 +379,7 @@ export default function FeedDashboard() {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between text-[8px] text-white/30 font-mono">
+              <div className="flex justify-between text-[8px] text-foreground/30 font-mono">
                 <span>Mon</span>
                 <span>Wed</span>
                 <span>Fri</span>
@@ -352,19 +397,19 @@ export default function FeedDashboard() {
           </div>
 
           {/* Activity Ledger Feed */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md hover:border-white/15 transition-all">
-            <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5 mb-4">
+          <div className="bg-card border border-border rounded-3xl p-6 backdrop-blur-md hover:border-border/80 transition-all">
+            <h3 className="text-xs font-bold text-foreground/60 uppercase tracking-wider flex items-center gap-1.5 mb-4">
               <Activity className="w-4 h-4 text-primary animate-pulse" />
               <span>Activity Log</span>
             </h3>
 
             <div className="space-y-3">
               {notificationLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2 text-xs border-b border-white/5 pb-2.5 last:border-b-0 last:pb-0">
+                <div key={log.id} className="flex items-start gap-2 text-xs border-b border-border pb-2.5 last:border-b-0 last:pb-0">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
                   <div className="space-y-0.5 min-w-0">
-                    <p className="text-white/80 leading-normal truncate-2-lines">{log.text}</p>
-                    <span className="text-[9px] text-white/30 block font-mono">{log.time}</span>
+                    <p className="text-foreground/80 leading-normal truncate-2-lines">{log.text}</p>
+                    <span className="text-[9px] text-foreground/30 block font-mono">{log.time}</span>
                   </div>
                 </div>
               ))}

@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
-import { apiGetPoll, apiGetResults, parsePollDescription, decodeJwt } from "@/lib/api";
+import { apiGetPoll, apiGetResults, parsePollDescription, decodeJwt, apiGetPolls } from "@/lib/api";
 
 interface CandidateResult {
   label: string;
@@ -72,39 +72,28 @@ function ResultsPageContent() {
     if (!isInitialized || !user) return;
 
     const loadPollList = async () => {
-      const uniquePollIds = Array.from(new Set([...createdPollIds, ...votedPollIds]));
-      const settled = await Promise.all(
-        uniquePollIds.map(async (id) => {
-          try {
-            const data = await apiGetPoll(id);
-            // Access control check: If simulated private, user must be owner or allowed email
-            const parsed = parsePollDescription(data.description);
-            if (parsed.isPrivate && data.admin_id !== currentUserId) {
-              const userEmail = user?.email?.toLowerCase();
-              if (!userEmail || !parsed.allowedEmails.includes(userEmail)) {
-                return null; // Skip private polls they aren't invited to
-              }
-            }
-            return { id: data.id, title: data.title };
-          } catch {
-            return null; // Skip deleted or inaccessible polls
-          }
-        })
-      );
-      const list = settled.filter((item): item is { id: string; title: string } => item !== null);
-      setPollList(list);
+      try {
+        const res = await apiGetPolls({ scope: "feed", limit: 100 });
+        const list = (res.data || []).map((poll: any) => ({
+          id: poll.id,
+          title: poll.title,
+        }));
+        setPollList(list);
 
-      // Select default poll from URL or first list item
-      const pollIdParam = searchParams.get("pollId");
-      if (pollIdParam && uniquePollIds.includes(pollIdParam)) {
-        setSelectedElection(pollIdParam);
-      } else if (list.length > 0) {
-        setSelectedElection(list[0].id);
+        // Select default poll from URL or first list item
+        const pollIdParam = searchParams.get("pollId");
+        if (pollIdParam && list.some((p: any) => p.id === pollIdParam)) {
+          setSelectedElection(pollIdParam);
+        } else if (list.length > 0) {
+          setSelectedElection(list[0].id);
+        }
+      } catch {
+        // Silent error
       }
     };
 
     loadPollList();
-  }, [isInitialized, user, currentUserId, createdPollIds, votedPollIds, searchParams]);
+  }, [isInitialized, user, currentUserId, searchParams]);
 
   // Fetch results for selected poll
   const loadSelectedResults = React.useCallback(async () => {

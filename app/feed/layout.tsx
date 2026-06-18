@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function FeedLayout({ children }: { children: React.ReactNode }) {
@@ -74,9 +75,9 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
   // Prevent flash of protected layout content if unauthenticated or during initial session boot
   if (!mounted || !isInitialized || !user) {
     return (
-      <div className="min-h-screen bg-[#050816] flex flex-col items-center justify-center text-white gap-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-foreground gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-sm font-mono text-white/60">Verifying secure session...</p>
+        <p className="text-sm font-mono text-foreground/60">Verifying secure session...</p>
       </div>
     );
   }
@@ -99,7 +100,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="relative min-h-screen bg-[#050816] text-white flex select-none overflow-x-hidden">
+    <div className="relative min-h-screen bg-background text-foreground flex select-none overflow-x-hidden">
       {/* Glow Effects */}
       <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-primary/5 via-accent/2 to-transparent pointer-events-none -z-10" />
       <div className="absolute top-[30%] left-[-10%] w-[35vw] h-[35vw] rounded-full bg-primary/3 blur-[120px] pointer-events-none -z-10" />
@@ -108,7 +109,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
 
       {/* Sidebar Frame */}
       {/* Desktop Sidebar */}
-      <aside className="w-64 border-r border-white/5 bg-[#080c1c]/40 backdrop-blur-xl shrink-0 hidden lg:flex flex-col justify-between py-6 sticky top-0 h-screen z-30">
+      <aside className="w-64 border-r border-border bg-card/40 backdrop-blur-xl shrink-0 hidden lg:flex flex-col justify-between py-6 sticky top-0 h-screen z-30">
         <div className="space-y-8">
           {/* Logo */}
           <div className="px-6 flex items-center gap-2">
@@ -124,11 +125,16 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
           <div className="px-4 relative">
             <button
               onClick={() => setIsOrgSwitcherOpen(!isOrgSwitcherOpen)}
-              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-left text-xs font-semibold"
+              className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-surface border border-border hover:bg-foreground/10 hover:border-border/80 transition-all text-left text-xs font-semibold"
             >
               <div className="flex items-center gap-2.5 truncate">
-                <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30 text-[10px] shrink-0 font-bold text-primary">
-                  {selectedOrg[0]?.toUpperCase() || "V"}
+                <div className="relative w-6 h-6 shrink-0">
+                  <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/30 text-[10px] font-bold text-primary">
+                    {selectedOrg[0]?.toUpperCase() || "V"}
+                  </div>
+                  {user?.isVerified && (
+                    <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-background shadow-[0_0_4px_rgba(16,185,129,0.6)] flex items-center justify-center" title="Verified" />
+                  )}
                 </div>
                 <span className="truncate">{selectedOrg}</span>
               </div>
@@ -136,7 +142,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
             </button>
 
             {isOrgSwitcherOpen && (
-              <div className="absolute left-4 right-4 top-full mt-2 bg-[#0c122c] border border-white/10 rounded-2xl p-2 shadow-2xl z-40 space-y-1">
+              <div className="absolute left-4 right-4 top-full mt-2 bg-card border border-border rounded-2xl p-2 shadow-2xl z-40 space-y-1">
                 {["Voter Account", "SecureVote Org", "University Board"].map((orgName) => (
                   <button
                     key={orgName}
@@ -145,7 +151,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                       setIsOrgSwitcherOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-all ${
-                      selectedOrg === orgName ? "bg-primary/20 text-white font-bold" : "text-white/60 hover:bg-white/5 hover:text-white"
+                      selectedOrg === orgName ? "bg-primary/20 text-primary font-bold" : "text-foreground/60 hover:bg-surface hover:text-foreground"
                     }`}
                   >
                     <span>{orgName}</span>
@@ -169,10 +175,10 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
                       ? "bg-primary/10 border border-primary/20 text-primary shadow-[0_4px_15px_rgba(49,107,243,0.1)]"
-                      : "border border-transparent text-white/50 hover:bg-white/5 hover:text-white"
+                      : "border border-transparent text-foreground/50 hover:bg-surface hover:text-foreground"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-primary animate-pulse" : "text-white/50"}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? "text-primary animate-pulse" : "text-foreground/50"}`} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -182,12 +188,12 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
 
         {/* Footer info & Logout */}
         <div className="px-3 space-y-4">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-white/[0.01] to-white/[0.04] border border-white/5 space-y-2">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-foreground/[0.01] to-foreground/[0.04] border border-border space-y-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Network Verified</span>
+              <span className="text-[10px] font-bold text-foreground/70 uppercase tracking-widest">Network Verified</span>
             </div>
-            <p className="text-[10px] text-white/40 leading-normal">
+            <p className="text-[10px] text-foreground/40 leading-normal">
               Consensus Node AMS-01 active. Latency 14ms.
             </p>
           </div>
@@ -218,7 +224,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 bottom-0 left-0 w-64 border-r border-white/5 bg-[#080c1c] z-50 flex flex-col justify-between py-6 lg:hidden"
+              className="fixed top-0 bottom-0 left-0 w-64 border-r border-border bg-card z-50 flex flex-col justify-between py-6 lg:hidden"
             >
               <div className="space-y-8">
                 {/* Header Logo */}
@@ -229,7 +235,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                     </div>
                     <span className="font-sans font-bold text-base tracking-tight">SecureVote</span>
                   </div>
-                  <button onClick={() => setIsSidebarOpen(false)} className="text-white/60 hover:text-white">
+                  <button onClick={() => setIsSidebarOpen(false)} className="text-foreground/60 hover:text-foreground">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -238,7 +244,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                 <nav className="px-3 space-y-1">
                   {navItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
 
                     return (
                       <button
@@ -250,7 +256,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
                           isActive
                             ? "bg-primary/10 border border-primary/20 text-primary"
-                            : "border border-transparent text-white/50 hover:bg-white/5 hover:text-white"
+                            : "border border-transparent text-foreground/50 hover:bg-surface hover:text-foreground"
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -279,23 +285,23 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-white/5 bg-[#050816]/60 backdrop-blur-xl px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
+        <header className="h-16 border-b border-border bg-background/60 backdrop-blur-xl px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-4">
             {/* Hamburger Button for mobile */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/5 text-white hover:bg-white/10"
+              className="lg:hidden p-2 rounded-xl bg-surface border border-border text-foreground hover:bg-foreground/10"
             >
               <Menu className="w-4 h-4" />
             </button>
 
             {/* Search Bar */}
             <div className="relative group max-w-xs hidden sm:block">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-all" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40 group-focus-within:text-primary transition-all" />
               <input
                 type="text"
                 placeholder="Search elections, audits, logs..."
-                className="w-64 h-10 pl-10 pr-4 rounded-xl bg-white/5 border border-white/5 text-xs placeholder-white/30 focus:bg-white/10 focus:border-primary focus:outline-none transition-all"
+                className="w-64 h-10 pl-10 pr-4 rounded-xl bg-surface border border-border text-xs placeholder-foreground/30 focus:bg-foreground/10 focus:border-primary focus:outline-none transition-all"
               />
             </div>
           </div>
@@ -304,7 +310,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer text-white/80"
+              className="p-2.5 rounded-xl bg-surface border border-border hover:bg-foreground/10 transition-all cursor-pointer text-foreground/80"
               title="Toggle Theme"
             >
               {mounted ? (
@@ -321,7 +327,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                   setIsNotificationsOpen(!isNotificationsOpen);
                   setIsProfileOpen(false);
                 }}
-                className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer text-white/80 relative"
+                className="p-2.5 rounded-xl bg-surface border border-border hover:bg-foreground/10 transition-all cursor-pointer text-foreground/80 relative"
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
@@ -330,8 +336,8 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#0c122c] border border-white/10 rounded-2xl p-4 shadow-2xl z-40 space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <div className="absolute right-0 mt-3 w-80 bg-card border border-border rounded-2xl p-4 shadow-2xl z-40 space-y-4">
+                  <div className="flex items-center justify-between border-b border-border pb-2">
                     <h3 className="text-xs font-bold">Notifications</h3>
                     <button
                       onClick={() =>
@@ -344,13 +350,13 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-white/40 text-center py-4">No notifications</p>
+                      <p className="text-xs text-foreground/40 text-center py-4">No notifications</p>
                     ) : (
                       notifications.map(n => (
                         <div
                           key={n.id}
                           className={`p-2.5 rounded-xl border text-xs transition-all relative ${
-                            n.read ? "bg-white/[0.01] border-white/5 text-white/60" : "bg-primary/5 border-primary/20 text-white font-medium"
+                            n.read ? "bg-foreground/[0.01] border-border text-foreground/60" : "bg-primary/5 border-primary/20 text-foreground font-medium"
                           }`}
                         >
                           <p>{n.text}</p>
@@ -364,7 +370,7 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             {/* Divider */}
-            <div className="w-[1px] h-6 bg-white/10 mx-1" />
+            <div className="w-[1px] h-6 bg-border mx-1" />
 
             {/* Profile Dropdown */}
             <div className="relative">
@@ -373,34 +379,44 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                   setIsProfileOpen(!isProfileOpen);
                   setIsNotificationsOpen(false);
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface border border-border hover:bg-foreground/10 hover:border-border/80 transition-all cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-xs font-extrabold text-white">
-                  {user?.username ? user.username[0].toUpperCase() : "U"}
-                </div>
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="avatar" className="w-6 h-6 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-xs font-extrabold text-white">
+                    {user?.username ? user.username[0].toUpperCase() : "U"}
+                  </div>
+                )}
                 <div className="text-left hidden sm:block">
-                  <p className="text-[11px] font-bold tracking-tight text-white leading-tight">
-                    {user?.username || "Demo User"}
-                  </p>
-                  <p className="text-[9px] text-white/40 leading-none">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[11px] font-bold tracking-tight text-foreground leading-tight">
+                      {user?.username || "Demo User"}
+                    </p>
+                    <VerifiedBadge isVerified={user?.isVerified} size="xs" showLabel={false} />
+                  </div>
+                  <p className="text-[9px] text-foreground/40 leading-none">
                     {user?.role === "admin" ? "Organization Owner" : "Decentralized Voter"}
                   </p>
                 </div>
-                <ChevronDown className="w-3 h-3 text-white/40" />
+                <ChevronDown className="w-3 h-3 text-foreground/40" />
               </button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-[#0c122c] border border-white/10 rounded-2xl p-2 shadow-2xl z-40 space-y-1">
-                  <div className="px-3 py-2 border-b border-white/5 mb-1 text-left">
-                    <p className="text-xs font-bold text-white truncate">{user?.username || "Demo User"}</p>
-                    <p className="text-[10px] text-white/40 truncate">{user?.email || "voter@securevote.io"}</p>
+                <div className="absolute right-0 mt-3 w-56 bg-card border border-border rounded-2xl p-2 shadow-2xl z-40 space-y-1">
+                  <div className="px-3 py-2 border-b border-border mb-1 text-left">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-bold text-foreground truncate">{user?.username || "Demo User"}</p>
+                      <VerifiedBadge isVerified={user?.isVerified} size="xs" />
+                    </div>
+                    <p className="text-[10px] text-foreground/40 truncate mt-0.5">{user?.email || "voter@securevote.io"}</p>
                   </div>
                   <button
                     onClick={() => {
                       router.push("/feed/settings");
                       setIsProfileOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs text-foreground/70 hover:bg-surface hover:text-foreground"
                   >
                     <User className="w-3.5 h-3.5" />
                     <span>My Profile</span>
@@ -410,12 +426,12 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
                       router.push("/feed/settings");
                       setIsProfileOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs text-foreground/70 hover:bg-surface hover:text-foreground"
                   >
                     <Settings className="w-3.5 h-3.5" />
                     <span>Account Settings</span>
                   </button>
-                  <div className="border-t border-white/5 my-1" />
+                  <div className="border-t border-border my-1" />
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs text-red-400 hover:bg-red-500/10"

@@ -32,6 +32,7 @@ interface Candidate {
 
 export default function CreateElectionPage() {
   const router = useRouter();
+  const { user } = useVotingStore();
   const [step, setStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
   const [skippedVoters, setSkippedVoters] = useState<string[]>([]);
@@ -41,10 +42,10 @@ export default function CreateElectionPage() {
   // Step 1: Details
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Council");
 
   // Step 2: Candidates
   const [candidates, setCandidates] = useState<Candidate[]>([
+    { name: "", bio: "" },
     { name: "", bio: "" }
   ]);
 
@@ -97,6 +98,7 @@ export default function CreateElectionPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [timezone, setTimezone] = useState("UTC+5:30 (IST)");
+  const [showLiveResults, setShowLiveResults] = useState(false);
 
   // Step 5: Publish/Submit UX
   const [isPublishing, setIsPublishing] = useState(false);
@@ -117,10 +119,25 @@ export default function CreateElectionPage() {
   };
 
   const handleNext = () => {
+    setErrorMessage("");
+    if (step === 1) {
+      if (!title.trim()) {
+        setErrorMessage("Election Title is required.");
+        return;
+      }
+    }
+    if (step === 2) {
+      const validCount = candidates.filter(c => c.name.trim() !== "").length;
+      if (validCount < 2) {
+        setErrorMessage("You must specify at least 2 candidates/choices.");
+        return;
+      }
+    }
     if (step < 5) setStep(prev => prev + 1);
   };
 
   const handleBack = () => {
+    setErrorMessage("");
     if (step > 1) setStep(prev => prev - 1);
   };
 
@@ -188,6 +205,7 @@ export default function CreateElectionPage() {
         auto_start: false,
         visibility: emailInvites.length > 0 ? ("private" as const) : ("public" as const),
         email_invites: emailInvites.length > 0 ? emailInvites : undefined,
+        show_live_results: showLiveResults,
         client_request_id: `web-create-${Date.now()}`
       };
 
@@ -226,6 +244,7 @@ export default function CreateElectionPage() {
             voting_end_at: finalEnd,
             auto_start: false,
             visibility: "public" as const, // Set backend visibility to public to bypass offline token check!
+            show_live_results: showLiveResults,
             client_request_id: `web-create-fallback-${Date.now()}`
           };
 
@@ -410,6 +429,7 @@ export default function CreateElectionPage() {
                     voting_end_at: finalEnd,
                     auto_start: false,
                     visibility: "public" as const,
+                    show_live_results: showLiveResults,
                     client_request_id: `web-create-public-${Date.now()}`
                   };
                   const res = await apiCreatePoll(body);
@@ -489,21 +509,7 @@ export default function CreateElectionPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-white/70">Category</label>
-                    <select
-                      value={category}
-                      onChange={e => setCategory(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl bg-[#080c1c] border border-white/10 text-white text-xs focus:border-primary focus:outline-none appearance-none"
-                    >
-                      <option value="Council">Council Election</option>
-                      <option value="Feedback">Feedback Poll</option>
-                      <option value="Survey">Community Survey</option>
-                      <option value="Resolution">Board Resolution</option>
-                    </select>
-                  </div>
-                </div>
+
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-white/70">Description / Guidelines</label>
@@ -564,7 +570,7 @@ export default function CreateElectionPage() {
                         className="w-full h-10 px-3 rounded-lg bg-white/[0.03] border border-white/10 text-white text-xs focus:border-primary focus:outline-none"
                       />
                     </div>
-                    {candidates.length > 1 && (
+                    {candidates.length > 2 && (
                       <div className="sm:col-span-1 text-center pt-4 sm:pt-0">
                         <button
                           type="button"
@@ -596,9 +602,9 @@ export default function CreateElectionPage() {
 
               <div className="grid grid-cols-3 gap-3 border-b border-white/5 pb-4">
                 {[
-                  { id: "manual", label: "Manual Entry", desc: "List emails manually" },
-                  { id: "csv", label: "CSV Upload", desc: "Batch import spreadsheet" },
-                  { id: "team", label: "Team Members", desc: "Import organization users" }
+                  { id: "manual", label: "Manual Entry", desc: "List emails manually", locked: false },
+                  { id: "csv", label: "CSV Upload", desc: "Batch import spreadsheet", locked: !user?.isVerified },
+                  { id: "team", label: "Team Members", desc: "Import organization users", locked: false }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -609,8 +615,16 @@ export default function CreateElectionPage() {
                         : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
                     }`}
                   >
-                    <p className="text-xs font-bold">{item.label}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-bold">{item.label}</p>
+                      {item.locked && (
+                        <Lock className="w-3 h-3 text-amber-400 shrink-0" aria-label="Requires Verification" />
+                      )}
+                    </div>
                     <p className="text-[9px] opacity-70 mt-0.5">{item.desc}</p>
+                    {item.locked && (
+                      <p className="text-[8px] text-amber-400/80 mt-0.5 font-semibold">Requires Verification</p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -631,23 +645,50 @@ export default function CreateElectionPage() {
                 )}
 
                 {voterMethod === "csv" && (
-                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.03] transition-all relative overflow-hidden group">
-                    <Upload className="w-8 h-8 text-white/40 group-hover:text-primary transition-all mb-2" />
-                    <p className="text-xs font-bold text-white/75">Choose CSV File</p>
-                    <p className="text-[10px] text-white/40 mt-1">First column must contain voter email addresses</p>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={e => setCsvFile(e.target.files?.[0] || null)}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    {csvFile && (
-                      <div className="absolute inset-0 bg-[#0c122c] flex items-center justify-center gap-2 p-4 text-xs font-semibold text-emerald-400">
-                        <CheckCircle className="w-5 h-5" />
-                        <span>{csvFile.name}</span>
+                  user?.isVerified ? (
+                    <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.03] transition-all relative overflow-hidden group">
+                      <Upload className="w-8 h-8 text-white/40 group-hover:text-primary transition-all mb-2" />
+                      <p className="text-xs font-bold text-white/75">Choose CSV File</p>
+                      <p className="text-[10px] text-white/40 mt-1">First column must contain voter email addresses</p>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={e => setCsvFile(e.target.files?.[0] || null)}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      {csvFile && (
+                        <div className="absolute inset-0 bg-[#0c122c] flex items-center justify-center gap-2 p-4 text-xs font-semibold text-emerald-400">
+                          <CheckCircle className="w-5 h-5" />
+                          <span>{csvFile.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Lock gate for unverified users */
+                    <div className="border-2 border-dashed border-amber-500/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-amber-500/[0.02] space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                        <Lock className="w-6 h-6 text-amber-400" />
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-amber-400">Verification Required</p>
+                        <p className="text-[10px] text-white/40 max-w-xs leading-normal">
+                          CSV batch voter upload is restricted to trusted &amp; verified accounts only.
+                          Complete your identity verification to unlock this feature.
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wider">
+                        <Lock className="w-2.5 h-2.5" /> Not Verified
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => router.push("/feed/verification")}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer mt-1"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Get Verified Now
+                      </button>
+                    </div>
+                  )
                 )}
 
                 {voterMethod === "team" && (
@@ -733,6 +774,44 @@ export default function CreateElectionPage() {
                     <option value="UTC+0:00 (GMT)">UTC+0:00 (GMT) - Greenwich Mean Time</option>
                     <option value="UTC+8:00 (SGT)">UTC+8:00 (SGT) - Singapore Standard Time</option>
                   </select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2 pt-2">
+                  <label className="text-xs font-semibold text-white/70">Results Visibility & Security</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowLiveResults(false)}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        !showLiveResults
+                          ? "bg-primary/20 border-primary text-white"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-primary" /> E2E Encrypted Tallies (Recommended)
+                      </p>
+                      <p className="text-[10px] opacity-70 mt-1 leading-normal">
+                        Ballots are encrypted locally on the voter&apos;s device. Results are only decrypted and visible after the election window closes.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLiveResults(true)}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        showLiveResults
+                          ? "bg-amber-500/10 border-amber-500/30 text-white"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 text-amber-400" /> Live Results (Plaintext)
+                      </p>
+                      <p className="text-[10px] opacity-70 mt-1 leading-normal">
+                        Submit votes in plaintext, allowing voters and organizers to see the live option counts count up in real-time.
+                      </p>
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -821,7 +900,6 @@ export default function CreateElectionPage() {
                   <h3 className="font-bold text-white">Election Details</h3>
                   <div className="space-y-1.5 text-white/70">
                     <p><span className="text-white/40">Title:</span> {title || "Untitled Election"}</p>
-                    <p><span className="text-white/40">Category:</span> {category}</p>
                     <p><span className="text-white/40">Schedule:</span> {startDate || "Immediate"} to {endDate || "Until Closed"}</p>
                     <p><span className="text-white/40">Time Zone:</span> {timezone}</p>
                   </div>

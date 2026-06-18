@@ -36,6 +36,7 @@ import {
   apiStartPoll,
   apiEndPoll,
   apiCastVote,
+  apiGetPolls,
   decodeJwt,
   parsePollDescription
 } from "@/lib/api";
@@ -71,41 +72,51 @@ function ElectionsPageContent() {
   const loadPolls = React.useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
-    const uniquePollIds = Array.from(new Set([...createdPollIds, ...votedPollIds]));
-    if (uniquePollIds.length === 0) {
-      setElections([]);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const promises = uniquePollIds.map(async (id) => {
+      const res = await apiGetPolls({ scope: "feed", limit: 100 });
+      const pollsList = res.data || [];
+      
+      // Step 1: Populate list immediately
+      const initialElections = pollsList.map((poll: any) => ({
+        id: poll.id,
+        title: poll.title,
+        description: "Loading details...",
+        category: "Standard",
+        status: poll.status === "active" ? "Active" : poll.status === "ended" ? "Completed" : "Scheduled",
+        votes: null,
+        totalVoters: null,
+        startDate: poll.voting_start_at ? new Date(poll.voting_start_at).toLocaleDateString() : "Manual",
+        endDate: poll.voting_end_at ? new Date(poll.voting_end_at).toLocaleDateString() : "Manual",
+        adminId: poll.admin_id,
+        options: null,
+        isPrivate: false,
+        allowedEmails: [],
+        candidates: null,
+      }));
+      setElections(initialElections);
+      setLoading(false);
+
+      // Step 2: Fetch detailed data in background
+      const promises = pollsList.map(async (poll: any) => {
         try {
-          const data = await apiGetPoll(id);
+          const data = await apiGetPoll(poll.id);
           let resultsData = null;
           try {
-            resultsData = await apiGetResults(id);
-          } catch {
-            // Ignore results fetch failure if poll has not ended or no votes cast
-          }
+            resultsData = await apiGetResults(poll.id);
+          } catch {}
 
           const totalVotes = resultsData?.total_votes || 0;
-
           const parsed = parsePollDescription(data.description);
           return {
             id: data.id,
-            title: data.title,
             description: parsed.description || "No description provided.",
             category: data.allow_admin_vote ? "Admin Allowed" : "Standard",
-            status: data.status === "active" ? "Active" : data.status === "ended" ? "Completed" : "Scheduled",
             votes: totalVotes,
-            totalVoters: data.options ? data.options.length * 100 : 0, // Representation
-            startDate: data.voting_start_at ? new Date(data.voting_start_at).toLocaleString() : "Manual",
-            endDate: data.voting_end_at ? new Date(data.voting_end_at).toLocaleString() : "Manual",
-            adminId: data.admin_id,
+            totalVoters: data.options ? data.options.length * 100 : 0,
             options: data.options || [],
             isPrivate: parsed.isPrivate,
             allowedEmails: parsed.allowedEmails,
+            choicesHidden: resultsData?.choices_hidden || false,
             candidates: (data.options || []).map((opt: string) => {
               const count = resultsData?.votes?.[opt] || 0;
               return {
@@ -113,21 +124,43 @@ function ElectionsPageContent() {
                 votes: count,
               };
             }),
-            ledgerHash: data.status === "ended" ? "0x" + id.replace(/-/g, "").slice(0, 24) : "Pending Close"
           };
         } catch {
-          return null; // Skip if deleted
+          return null;
         }
       });
 
-      const results = await Promise.all(promises);
-      setElections(results.filter((e) => e !== null) as any[]);
+      const bgData = await Promise.all(promises);
+
+      // Step 3: Hydrate details dynamically
+      setElections((prev) =>
+        prev
+          .map((item) => {
+            const bgItem = bgData.find((d) => d && d.id === item.id);
+            if (bgItem) {
+              return {
+                ...item,
+                description: bgItem.description,
+                category: bgItem.category,
+                votes: bgItem.votes,
+                totalVoters: bgItem.totalVoters,
+                options: bgItem.options,
+                isPrivate: bgItem.isPrivate,
+                allowedEmails: bgItem.allowedEmails,
+                choicesHidden: bgItem.choicesHidden,
+                candidates: bgItem.candidates,
+              };
+            }
+            return item;
+          })
+          .filter((e) => e !== null)
+      );
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to load election details.");
     } finally {
       setLoading(false);
     }
-  }, [createdPollIds, votedPollIds]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -336,9 +369,28 @@ function ElectionsPageContent() {
       {/* Election Grid / List */}
       <div className="grid grid-cols-1 gap-4">
         {loading && elections.length === 0 ? (
-          <div className="min-h-[200px] flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          </div>
+          Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-sm space-y-4 animate-pulse"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 bg-white/10 rounded w-1/3" />
+                    <div className="h-4 bg-white/5 rounded w-16" />
+                    <div className="h-4 bg-white/5 rounded w-12" />
+                  </div>
+                  <div className="h-4 bg-white/5 rounded w-1/2" />
+                  <div className="flex items-center gap-4 text-[10px] text-white/40 pt-1">
+                    <div className="h-3 bg-white/5 rounded w-20" />
+                    <div className="h-3 bg-white/5 rounded w-36" />
+                  </div>
+                </div>
+                <div className="h-10 w-24 bg-white/5 rounded-xl" />
+              </div>
+            </div>
+          ))
         ) : filteredElections.length === 0 ? (
           <div className="border border-white/5 rounded-3xl p-12 text-center bg-white/[0.01] space-y-4">
             <ShieldCheck className="w-12 h-12 text-white/20 mx-auto" />
@@ -362,9 +414,13 @@ function ElectionsPageContent() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-bold text-white">{elec.title}</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-white/50 border border-white/5 uppercase font-bold">
-                        {elec.category}
-                      </span>
+                      {elec.votes === null ? (
+                        <div className="h-4 w-12 bg-white/10 rounded animate-pulse" />
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-white/50 border border-white/5 uppercase font-bold">
+                          {elec.category}
+                        </span>
+                      )}
                       <span
                         className={`text-[8px] px-2 py-0.5 rounded font-black uppercase shrink-0 ${
                           elec.status === "Active"
@@ -377,10 +433,16 @@ function ElectionsPageContent() {
                         {elec.status}
                       </span>
                     </div>
-                    <p className="text-xs text-white/50">{elec.description}</p>
+                    {elec.description === "Loading details..." ? (
+                      <div className="h-4 bg-white/5 rounded animate-pulse w-1/2 mt-1" />
+                    ) : (
+                      <p className="text-xs text-white/50">{elec.description}</p>
+                    )}
                     <div className="flex items-center gap-4 text-[10px] text-white/40 font-mono pt-1">
                       <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-primary" /> {elec.votes} Votes Cast
+                        <Users className="w-3.5 h-3.5 text-primary" /> {elec.votes === null ? (
+                          <span className="inline-block w-8 h-3 bg-white/10 rounded animate-pulse align-middle" />
+                        ) : `${elec.votes} Votes Cast`}
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-primary" /> Start: {elec.startDate} | End: {elec.endDate}
@@ -423,35 +485,64 @@ function ElectionsPageContent() {
                           <h4 className="font-bold text-white flex items-center gap-1.5">
                             <Users className="w-4 h-4 text-primary" /> Candidates & Options
                           </h4>
-                          <div className="space-y-2.5">
-                            {elec.candidates.map((cand: any, idx: number) => {
-                              const pct = elec.votes > 0 ? Math.round((cand.votes / elec.votes) * 100) : 0;
-                              return (
-                                <div key={idx} className="space-y-1">
-                                  <div className="flex justify-between text-[11px] items-center">
+                          {elec.candidates === null ? (
+                            <div className="space-y-2 py-2">
+                              <div className="h-6 bg-white/5 rounded animate-pulse w-full" />
+                              <div className="h-6 bg-white/5 rounded animate-pulse w-5/6" />
+                            </div>
+                          ) : elec.choicesHidden ? (
+                            <div className="space-y-4 py-2">
+                              <div className="space-y-2">
+                                {elec.candidates.map((cand: any, idx: number) => (
+                                  <div key={idx} className="flex justify-between text-[11px] items-center border-b border-white/5 pb-2 last:border-b-0 last:pb-0">
                                     <span className="font-bold text-white/80">{cand.name}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-white/60">{cand.votes} votes ({pct}%)</span>
-                                      {canVote && (
-                                        <button
-                                          onClick={() => handleVote(elec.id, idx)}
-                                          className="px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-all cursor-pointer"
-                                        >
-                                          Vote
-                                        </button>
-                                      )}
+                                    {canVote && (
+                                      <button
+                                        onClick={() => handleVote(elec.id, idx)}
+                                        className="px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-all cursor-pointer"
+                                      >
+                                        Vote
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl text-[10px] text-primary leading-normal flex items-start gap-2">
+                                <Lock className="w-4 h-4 shrink-0 text-primary mt-0.5" />
+                                <span>Zero-Knowledge Encryption Active. Ballots are encrypted locally. Results will be decrypted and validated by consensus validator nodes once the voting period closes.</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {elec.candidates.map((cand: any, idx: number) => {
+                                const pct = elec.votes > 0 ? Math.round((cand.votes / elec.votes) * 100) : 0;
+                                return (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between text-[11px] items-center">
+                                      <span className="font-bold text-white/80">{cand.name}</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono text-white/60">{cand.votes} votes ({pct}%)</span>
+                                        {canVote && (
+                                          <button
+                                            onClick={() => handleVote(elec.id, idx)}
+                                            className="px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-all cursor-pointer"
+                                          >
+                                            Vote
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                                        style={{ width: `${pct}%` }}
+                                      />
                                     </div>
                                   </div>
-                                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Cryptographic Ledger Details & Admin controls */}

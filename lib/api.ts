@@ -1,3 +1,5 @@
+import { encryptBallot } from "./crypto";
+
 // Base URLs
 export const AUTH_API_URL =
   typeof window !== "undefined"
@@ -109,7 +111,8 @@ export async function authFetch(
     response.status === 401 &&
     !url.includes("/auth/login") &&
     !url.includes("/auth/org/login") &&
-    !url.includes("/auth/refresh")
+    !url.includes("/auth/refresh") &&
+    !url.includes("/auth/forgot-password")
   ) {
     const refreshedToken = await apiRefresh();
     if (refreshedToken) {
@@ -460,11 +463,37 @@ export async function apiEndPoll(pollId: string) {
 }
 
 export async function apiCastVote(pollId: string, optionIdx: number) {
-  const res = await authFetch(`${VOTE_API_URL}/vote/v1/polls/${pollId}/vote`, {
-    method: "POST",
-    body: JSON.stringify({ poll_id: pollId, option_idx: optionIdx }),
-  });
-  return handleApiResponse(res);
+  // Fetch the full poll to check ballot_mode
+  const poll = await apiGetPoll(pollId);
+  const ballotMode = poll.ballot_mode || "legacy_plaintext";
+
+  if (ballotMode === "e2e_encrypted") {
+    if (!poll.election_public_key) {
+      throw new Error("Election is missing public key for secure E2E encryption.");
+    }
+    const { encryptedBallot, ballotHash } = await encryptBallot(
+      pollId,
+      optionIdx,
+      poll.election_public_key
+    );
+    const res = await authFetch(`${VOTE_API_URL}/vote/v1/polls/${pollId}/vote`, {
+      method: "POST",
+      body: JSON.stringify({
+        poll_id: pollId,
+        encrypted_ballot: encryptedBallot,
+        ballot_hash: ballotHash,
+        client_crypto_version: "nacl-box-v1",
+      }),
+    });
+    return handleApiResponse(res);
+  } else {
+    // legacy_plaintext
+    const res = await authFetch(`${VOTE_API_URL}/vote/v1/polls/${pollId}/vote`, {
+      method: "POST",
+      body: JSON.stringify({ poll_id: pollId, option_idx: optionIdx }),
+    });
+    return handleApiResponse(res);
+  }
 }
 
 export async function apiGetResults(pollId: string) {
@@ -572,6 +601,55 @@ export function parsePollDescription(rawDescription: string = "") {
     allowedEmails: [],
   };
 }
+
+export async function apiForgotPasswordSendOtp(email: string) {
+  const res = await authFetch(`${AUTH_API_URL}/auth/forgot-password/send-otp`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  return handleApiResponse(res);
+}
+
+export async function apiForgotPasswordVerifyOtp(email: string, otp: string) {
+  const res = await authFetch(`${AUTH_API_URL}/auth/forgot-password/verify-otp`, {
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+  });
+  return handleApiResponse(res);
+}
+
+export async function apiForgotPasswordReset(resetToken: string, newPassword: string) {
+  const res = await authFetch(`${AUTH_API_URL}/auth/forgot-password/reset`, {
+    method: "POST",
+    body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+  });
+  return handleApiResponse(res);
+}
+
+export async function apiGetPolls(params: {
+  scope?: "admin" | "participated" | "feed" | "profile" | "team";
+  admin_id?: string;
+  admin_account_type?: "user" | "organization";
+  status?: string;
+  limit?: number;
+  cursor?: string;
+  team_id?: string;
+} = {}) {
+  const q = new URLSearchParams();
+  if (params.scope) q.set("scope", params.scope);
+  if (params.admin_id) q.set("admin_id", params.admin_id);
+  if (params.admin_account_type) q.set("admin_account_type", params.admin_account_type);
+  if (params.status) q.set("status", params.status);
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.cursor) q.set("cursor", params.cursor);
+  if (params.team_id) q.set("team_id", params.team_id);
+
+  const res = await authFetch(`${VOTE_API_URL}/vote/v1/polls?${q.toString()}`, {
+    method: "GET",
+  });
+  return handleApiResponse(res);
+}
+
 
 
 

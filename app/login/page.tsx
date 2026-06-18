@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
+import { apiForgotPasswordSendOtp, apiForgotPasswordVerifyOtp, apiForgotPasswordReset } from "@/lib/api";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -39,6 +40,20 @@ function LoginPageContent() {
   const [submitStep, setSubmitStep] = useState(0);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Forgot Password States
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotResetToken, setForgotResetToken] = useState("");
+  const [forgotIsSubmitting, setForgotIsSubmitting] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [forgotShowPassword, setForgotShowPassword] = useState(false);
+  const [forgotShowConfirmPassword, setForgotShowConfirmPassword] = useState(false);
 
   // Live Audit Logs State
   const [liveLogs, setLiveLogs] = useState<Array<{ id: number; text: string; time: string; type: string }>>([
@@ -135,6 +150,107 @@ function LoginPageContent() {
       setSubmitError(err?.message || "Authentication process failed.");
       setIsSubmitting(false);
       setSubmitStep(0);
+    }
+  };
+
+  const resetForgotState = () => {
+    setForgotMode(false);
+    setForgotStep(1);
+    setForgotOtp("");
+    setForgotPassword("");
+    setForgotConfirmPassword("");
+    setForgotResetToken("");
+    setForgotIsSubmitting(false);
+    setForgotError("");
+    setForgotSuccess(false);
+    setForgotShowPassword(false);
+    setForgotShowConfirmPassword(false);
+  };
+
+  const handleForgotSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    const trimmedEmail = forgotEmail.trim();
+    if (!trimmedEmail) {
+      setForgotError("Email is required");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setForgotError("Please enter a valid email address");
+      return;
+    }
+
+    setForgotIsSubmitting(true);
+    try {
+      await apiForgotPasswordSendOtp(trimmedEmail.toLowerCase());
+      setForgotIsSubmitting(false);
+      setForgotStep(2);
+    } catch (err: any) {
+      setForgotError(err?.message || "Failed to send reset code.");
+      setForgotIsSubmitting(false);
+    }
+  };
+
+  const handleForgotVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    const trimmedOtp = forgotOtp.trim();
+    if (!trimmedOtp) {
+      setForgotError("Code is required");
+      return;
+    }
+    if (trimmedOtp.length !== 6 || !/^\d+$/.test(trimmedOtp)) {
+      setForgotError("Code must be a 6-digit number");
+      return;
+    }
+
+    setForgotIsSubmitting(true);
+    try {
+      const data = await apiForgotPasswordVerifyOtp(forgotEmail.trim().toLowerCase(), trimmedOtp);
+      if (data && data.reset_token) {
+        setForgotResetToken(data.reset_token);
+        setForgotIsSubmitting(false);
+        setForgotStep(3);
+      } else {
+        throw new Error("Invalid verification response. Reset token not found.");
+      }
+    } catch (err: any) {
+      setForgotError(err?.message || "Verification failed. Please check your code.");
+      setForgotIsSubmitting(false);
+    }
+  };
+
+  const handleForgotResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+
+    if (!forgotPassword) {
+      setForgotError("Password is required");
+      return;
+    }
+    if (forgotPassword.length < 8) {
+      setForgotError("Password must be at least 8 characters long");
+      return;
+    }
+    if (forgotPassword !== forgotConfirmPassword) {
+      setForgotError("Passwords do not match");
+      return;
+    }
+
+    setForgotIsSubmitting(true);
+    try {
+      await apiForgotPasswordReset(forgotResetToken, forgotPassword);
+      setForgotIsSubmitting(false);
+      setForgotStep(4);
+      setForgotSuccess(true);
+      // Wait for success screen and reset forgot state to return to login
+      setTimeout(() => {
+        resetForgotState();
+      }, 2500);
+    } catch (err: any) {
+      setForgotError(err?.message || "Failed to reset password.");
+      setForgotIsSubmitting(false);
     }
   };
 
@@ -352,204 +468,467 @@ function LoginPageContent() {
               )}
             </AnimatePresence>
 
-            {/* Account Type Toggle */}
-            <div className="grid grid-cols-2 p-1 rounded-lg bg-white/[0.02] border border-white/5 relative z-10 mb-8 max-w-xs mx-auto">
-              <button
-                type="button"
-                onClick={() => setAccountType("individual")}
-                className={`relative py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                  accountType === "individual" ? "text-white" : "text-foreground/40 hover:text-foreground/70"
-                }`}
-              >
-                {accountType === "individual" && (
-                  <motion.div
-                    layoutId="activeTypeIndicator"
-                    className="absolute inset-0 rounded-md bg-white/[0.05] border border-white/10 -z-10"
-                    transition={{ type: "spring", stiffness: 380, damping: 28 }}
-                  />
-                )}
-                Individual
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccountType("organization")}
-                className={`relative py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                  accountType === "organization" ? "text-white" : "text-foreground/40 hover:text-foreground/70"
-                }`}
-              >
-                {accountType === "organization" && (
-                  <motion.div
-                    layoutId="activeTypeIndicator"
-                    className="absolute inset-0 rounded-md bg-white/[0.05] border border-white/10 -z-10"
-                    transition={{ type: "spring", stiffness: 380, damping: 28 }}
-                  />
-                )}
-                Organization
-              </button>
-            </div>
-
-            {submitError && (
-              <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5">
-                <BadgeAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            {/* Form Fields */}
-            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-              <AnimatePresence mode="wait">
-                {accountType === "individual" ? (
-                  <motion.div
-                    key="login-individual"
-                    variants={formAnimationVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="space-y-5"
-                  >
-                    <div className="space-y-1">
-                      <h3 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back</h3>
-                      <p className="text-sm text-foreground/50">Sign in to access your voting dashboard</p>
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                      <div className="relative group">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
-                          <Mail className="w-5 h-5" />
-                        </div>
-                        <input
-                          type="email"
-                          required
-                          autoComplete="email"
-                          placeholder="Email Address"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
-                        />
+            <AnimatePresence mode="wait">
+              {forgotMode ? (
+                <motion.div
+                  key="forgot-password-flow"
+                  variants={formAnimationVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="space-y-6 relative z-10"
+                >
+                  {forgotStep === 1 && (
+                    <form onSubmit={handleForgotSendOtp} className="space-y-5">
+                      <div className="space-y-1 text-center sm:text-left">
+                        <h3 className="text-2xl font-bold tracking-tight text-foreground">Reset Password</h3>
+                        <p className="text-sm text-foreground/50">Enter your email to receive a 6-digit verification code</p>
                       </div>
 
-                      <div className="relative group">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
-                          <Lock className="w-5 h-5" />
+                      {forgotError && (
+                        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5">
+                          <BadgeAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{forgotError}</span>
                         </div>
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          required
-                          autoComplete="current-password"
-                          placeholder="Password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
-                        />
+                      )}
+
+                      <div className="space-y-4 pt-2">
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                            <Mail className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="email"
+                            required
+                            placeholder="Email Address"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={forgotIsSubmitting}
+                        variant="primary"
+                        className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        {forgotIsSubmitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Sending Code...
+                          </>
+                        ) : (
+                          "Send OTP Code"
+                        )}
+                      </Button>
+
+                      <div className="text-center pt-2">
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                          onClick={resetForgotState}
+                          className="inline-flex items-center gap-2 text-xs text-foreground/60 hover:text-foreground hover:underline font-semibold cursor-pointer bg-transparent border-0 focus:outline-none"
                         >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
                         </button>
                       </div>
-                    </div>
+                    </form>
+                  )}
 
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <label className="flex items-center gap-2 text-foreground/60 hover:text-foreground cursor-pointer">
-                        <input type="checkbox" className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0" />
-                        Remember me
-                      </label>
-                      <a href="#" className="font-semibold text-primary hover:underline">Forgot Password?</a>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      Sign In
-                    </Button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="login-org"
-                    variants={formAnimationVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="space-y-5"
-                  >
-                    <div className="space-y-1">
-                      <h3 className="text-2xl font-bold tracking-tight text-foreground">Organization Portal</h3>
-                      <p className="text-sm text-foreground/50">Manage elections securely</p>
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                      <div className="relative group">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
-                          <Building className="w-5 h-5" />
-                        </div>
-                        <input
-                          type="email"
-                          required
-                          autoComplete="email"
-                          placeholder="Organization Official Email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
-                        />
+                  {forgotStep === 2 && (
+                    <form onSubmit={handleForgotVerifyOtp} className="space-y-5">
+                      <div className="space-y-1 text-center sm:text-left">
+                        <h3 className="text-2xl font-bold tracking-tight text-foreground">Verify OTP</h3>
+                        <p className="text-sm text-foreground/50">
+                          We sent a 6-digit code to <span className="text-primary font-semibold">{forgotEmail}</span>
+                        </p>
                       </div>
 
-                      <div className="relative group">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
-                          <Lock className="w-5 h-5" />
+                      {forgotError && (
+                        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5">
+                          <BadgeAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{forgotError}</span>
                         </div>
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          required
-                          autoComplete="current-password"
-                          placeholder="Password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
-                        />
+                      )}
+
+                      <div className="space-y-4 pt-2">
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                            <KeyRound className="w-5 h-5" />
+                          </div>
+                          <input
+                            type="text"
+                            required
+                            maxLength={6}
+                            placeholder="Enter 6-digit code"
+                            value={forgotOtp}
+                            onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ""))}
+                            className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm tracking-[0.25em] font-mono placeholder:tracking-normal placeholder:font-sans placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={forgotIsSubmitting}
+                        variant="primary"
+                        className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        {forgotIsSubmitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Verifying...
+                          </>
+                        ) : (
+                          "Verify Code"
+                        )}
+                      </Button>
+
+                      <div className="flex justify-between items-center pt-2 text-xs">
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                          onClick={() => setForgotStep(1)}
+                          className="inline-flex items-center gap-1.5 text-foreground/60 hover:text-foreground hover:underline font-semibold cursor-pointer bg-transparent border-0 focus:outline-none"
                         >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          <ArrowLeft className="w-3.5 h-3.5" /> Change Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setForgotError("");
+                            try {
+                              await apiForgotPasswordSendOtp(forgotEmail.toLowerCase());
+                              alert("OTP resent successfully!");
+                            } catch (err: any) {
+                              setForgotError(err?.message || "Failed to resend code.");
+                            }
+                          }}
+                          className="text-primary hover:underline font-semibold cursor-pointer bg-transparent border-0 focus:outline-none"
+                        >
+                          Resend Code
                         </button>
                       </div>
-                    </div>
+                    </form>
+                  )}
 
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <label className="flex items-center gap-2 text-foreground/60 hover:text-foreground cursor-pointer">
-                        <input type="checkbox" className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0" />
-                        Remember organization
-                      </label>
-                      <a href="#" className="font-semibold text-primary hover:underline">Forgot Portal Key?</a>
-                    </div>
+                  {forgotStep === 3 && (
+                    <form onSubmit={handleForgotResetPassword} className="space-y-5">
+                      <div className="space-y-1 text-center sm:text-left">
+                        <h3 className="text-2xl font-bold tracking-tight text-foreground">Set New Password</h3>
+                        <p className="text-sm text-foreground/50">Create a secure new password for your account</p>
+                      </div>
 
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      {forgotError && (
+                        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5">
+                          <BadgeAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{forgotError}</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-4 pt-2">
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                            <Lock className="w-5 h-5" />
+                          </div>
+                          <input
+                            type={forgotShowPassword ? "text" : "password"}
+                            required
+                            placeholder="New Password"
+                            value={forgotPassword}
+                            onChange={(e) => setForgotPassword(e.target.value)}
+                            className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setForgotShowPassword(!forgotShowPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                          >
+                            {forgotShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                            <Lock className="w-5 h-5" />
+                          </div>
+                          <input
+                            type={forgotShowConfirmPassword ? "text" : "password"}
+                            required
+                            placeholder="Confirm New Password"
+                            value={forgotConfirmPassword}
+                            onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                            className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setForgotShowConfirmPassword(!forgotShowConfirmPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                          >
+                            {forgotShowConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={forgotIsSubmitting}
+                        variant="primary"
+                        className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        {forgotIsSubmitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Updating Password...
+                          </>
+                        ) : (
+                          "Reset Password"
+                        )}
+                      </Button>
+                    </form>
+                  )}
+
+                  {forgotStep === 4 && (
+                    <div className="text-center py-6 space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-400 animate-bounce" />
+                      </div>
+                      <h3 className="text-xl font-bold text-foreground">Password Reset Successfully</h3>
+                      <p className="text-sm text-foreground/60 max-w-xs mx-auto">
+                        Your password has been securely updated. Redirecting you back to login...
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="login-main-flow"
+                  variants={formAnimationVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  {/* Account Type Toggle */}
+                  <div className="grid grid-cols-2 p-1 rounded-lg bg-white/[0.02] border border-white/5 relative z-10 mb-8 max-w-xs mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => setAccountType("individual")}
+                      className={`relative py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                        accountType === "individual" ? "text-white" : "text-foreground/40 hover:text-foreground/70"
+                      }`}
                     >
-                      Sign In as Organization
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </form>
+                      {accountType === "individual" && (
+                        <motion.div
+                          layoutId="activeTypeIndicator"
+                          className="absolute inset-0 rounded-md bg-white/[0.05] border border-white/10 -z-10"
+                          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                        />
+                      )}
+                      Individual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAccountType("organization")}
+                      className={`relative py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                        accountType === "organization" ? "text-white" : "text-foreground/40 hover:text-foreground/70"
+                      }`}
+                    >
+                      {accountType === "organization" && (
+                        <motion.div
+                          layoutId="activeTypeIndicator"
+                          className="absolute inset-0 rounded-md bg-white/[0.05] border border-white/10 -z-10"
+                          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                        />
+                      )}
+                      Organization
+                    </button>
+                  </div>
 
-            {/* Bottom link to Register */}
-            <div className="text-center text-xs text-foreground/60 mt-8 relative z-10">
-              Don&apos;t have an account?{" "}
-              <button 
-                onClick={() => router.push("/register")}
-                className="font-bold text-primary hover:underline cursor-pointer"
-              >
-                Register here
-              </button>
-            </div>
+                  {submitError && (
+                    <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2.5">
+                      <BadgeAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{submitError}</span>
+                    </div>
+                  )}
+
+                  {/* Form Fields */}
+                  <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+                    <AnimatePresence mode="wait">
+                      {accountType === "individual" ? (
+                        <motion.div
+                          key="login-individual"
+                          variants={formAnimationVariants}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          className="space-y-5"
+                        >
+                          <div className="space-y-1">
+                            <h3 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back</h3>
+                            <p className="text-sm text-foreground/50">Sign in to access your voting dashboard</p>
+                          </div>
+
+                          <div className="space-y-4 pt-2">
+                            <div className="relative group">
+                              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                                <Mail className="w-5 h-5" />
+                              </div>
+                              <input
+                                type="email"
+                                required
+                                autoComplete="email"
+                                placeholder="Email Address"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                              />
+                            </div>
+
+                            <div className="relative group">
+                              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                                <Lock className="w-5 h-5" />
+                              </div>
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                required
+                                autoComplete="current-password"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-1">
+                            <label className="flex items-center gap-2 text-foreground/60 hover:text-foreground cursor-pointer">
+                              <input type="checkbox" className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0" />
+                              Remember me
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotMode(true);
+                                setForgotEmail(email);
+                                setForgotStep(1);
+                              }}
+                              className="font-semibold text-primary hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs focus:outline-none"
+                            >
+                              Forgot Password?
+                            </button>
+                          </div>
+
+                          <Button
+                            type="submit"
+                            variant="primary"
+                            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                          >
+                            Sign In
+                          </Button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="login-org"
+                          variants={formAnimationVariants}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          className="space-y-5"
+                        >
+                          <div className="space-y-1">
+                            <h3 className="text-2xl font-bold tracking-tight text-foreground">Organization Portal</h3>
+                            <p className="text-sm text-foreground/50">Manage elections securely</p>
+                          </div>
+
+                          <div className="space-y-4 pt-2">
+                            <div className="relative group">
+                              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                                <Building className="w-5 h-5" />
+                              </div>
+                              <input
+                                type="email"
+                                required
+                                autoComplete="email"
+                                placeholder="Organization Official Email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                              />
+                            </div>
+
+                            <div className="relative group">
+                              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 group-focus-within:text-primary transition-colors">
+                                <Lock className="w-5 h-5" />
+                              </div>
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                required
+                                autoComplete="current-password"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-sm placeholder-foreground/30 focus:bg-white/[0.05] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none transition-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-1">
+                            <label className="flex items-center gap-2 text-foreground/60 hover:text-foreground cursor-pointer">
+                              <input type="checkbox" className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0" />
+                              Remember organization
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotMode(true);
+                                setForgotEmail(email);
+                                setForgotStep(1);
+                              }}
+                              className="font-semibold text-primary hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs focus:outline-none"
+                            >
+                              Forgot Portal Key?
+                            </button>
+                          </div>
+
+                          <Button
+                            type="submit"
+                            variant="primary"
+                            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#5082f5] text-white font-bold tracking-wide hover:shadow-[0_0_30px_rgba(49,107,243,0.45)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                          >
+                            Sign In as Organization
+                          </Button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </form>
+
+                  {/* Bottom link to Register */}
+                  <div className="text-center text-xs text-foreground/60 mt-8 relative z-10">
+                    Don&apos;t have an account?{" "}
+                    <button 
+                      onClick={() => router.push("/register")}
+                      className="font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      Register here
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </div>
         </motion.div>

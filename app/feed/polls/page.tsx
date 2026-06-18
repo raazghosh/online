@@ -25,7 +25,8 @@ import {
   apiCreatePoll,
   apiEndPoll,
   apiDeletePoll,
-  apiCastVote
+  apiCastVote,
+  apiGetPolls
 } from "@/lib/api";
 
 interface OptionTally {
@@ -38,8 +39,10 @@ interface UIInstancePoll {
   question: string;
   category: string;
   status: "active" | "closed";
-  options: OptionTally[];
+  options: OptionTally[] | null;
   endDate: string;
+  ballotMode?: string;
+  choicesHidden?: boolean;
 }
 
 export default function PollsPage() {
@@ -60,23 +63,32 @@ export default function PollsPage() {
   const loadPolls = React.useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
-    const uniquePollIds = Array.from(new Set([...createdPollIds, ...votedPollIds]));
-    if (uniquePollIds.length === 0) {
-      setPolls([]);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const promises = uniquePollIds.map(async (id) => {
+      const res = await apiGetPolls({ scope: "feed", limit: 100 });
+      const pollsList = res.data || [];
+
+      // Step 1: Render basic polls list instantly
+      const initialPolls = pollsList.map((poll: any) => ({
+        id: poll.id,
+        question: poll.title,
+        category: "General",
+        status: poll.status === "active" ? ("active" as const) : ("closed" as const),
+        options: null,
+        endDate: poll.voting_end_at ? new Date(poll.voting_end_at).toLocaleDateString() : "Manual Close",
+        ballotMode: poll.ballot_mode || "legacy_plaintext",
+        choicesHidden: false,
+      }));
+      setPolls(initialPolls);
+      setLoading(false);
+
+      // Step 2: Fetch detailed options & results in background
+      const promises = pollsList.map(async (poll: any) => {
         try {
-          const data = await apiGetPoll(id);
+          const data = await apiGetPoll(poll.id);
           let resultsData = null;
           try {
-            resultsData = await apiGetResults(id);
-          } catch {
-            // Ignore results fetch failure if poll has not ended or no votes cast
-          }
+            resultsData = await apiGetResults(poll.id);
+          } catch {}
 
           const formattedOptions = (data.options || []).map((opt: string) => ({
             label: opt,
@@ -85,27 +97,44 @@ export default function PollsPage() {
 
           return {
             id: data.id,
-            question: data.title,
             category: data.description && data.description.startsWith("Category: ")
               ? data.description.replace("Category: ", "")
               : "General",
-            status: data.status === "active" ? ("active" as const) : ("closed" as const),
             options: formattedOptions,
-            endDate: data.voting_end_at ? new Date(data.voting_end_at).toLocaleDateString() : "Manual Close",
+            ballotMode: data.ballot_mode || "legacy_plaintext",
+            choicesHidden: resultsData?.choices_hidden || false,
           };
         } catch {
-          return null; // Skip if deleted
+          return null;
         }
       });
 
-      const results = await Promise.all(promises);
-      setPolls(results.filter((p) => p !== null) as UIInstancePoll[]);
+      const bgData = await Promise.all(promises);
+
+      // Step 3: Populate options dynamically
+      setPolls((prev) =>
+        prev
+          .map((item) => {
+            const bgItem = bgData.find((d) => d && d.id === item.id);
+            if (bgItem) {
+              return {
+                ...item,
+                category: bgItem.category,
+                options: bgItem.options,
+                ballotMode: bgItem.ballotMode,
+                choicesHidden: bgItem.choicesHidden,
+              };
+            }
+            return item;
+          })
+          .filter((p) => p !== null)
+      );
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to load polls.");
     } finally {
       setLoading(false);
     }
-  }, [createdPollIds, votedPollIds]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -249,8 +278,31 @@ export default function PollsPage() {
 
       {/* Poll list */}
       {loading && polls.length === 0 ? (
-        <div className="min-h-[200px] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {Array.from({ length: 2 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-6 animate-pulse"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="h-5 bg-white/5 rounded w-16" />
+                  <div className="h-4 bg-white/5 rounded w-12" />
+                </div>
+                <div className="h-5 bg-white/10 rounded w-2/3" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-4 bg-white/5 rounded w-full" />
+                <div className="h-1.5 bg-white/5 rounded-full w-full" />
+                <div className="h-4 bg-white/5 rounded w-5/6" />
+                <div className="h-1.5 bg-white/5 rounded-full w-5/6" />
+              </div>
+              <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                <div className="h-3 bg-white/5 rounded w-24" />
+                <div className="h-3 bg-white/5 rounded w-16" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : polls.length === 0 ? (
         <div className="border border-white/5 rounded-3xl p-12 text-center bg-white/[0.01] space-y-4">
@@ -263,7 +315,7 @@ export default function PollsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {polls.map((poll) => {
-            const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
+            const totalVotes = poll.options ? poll.options.reduce((sum, o) => sum + o.votes, 0) : 0;
             const canVote = poll.status === "active" && !votedPollIds.includes(poll.id);
 
             return (
@@ -273,9 +325,13 @@ export default function PollsPage() {
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-white/60 border border-white/5 font-bold uppercase tracking-wider">
-                      {poll.category}
-                    </span>
+                    {poll.options === null ? (
+                      <div className="h-5 w-16 bg-white/5 rounded animate-pulse" />
+                    ) : (
+                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-white/60 border border-white/5 font-bold uppercase tracking-wider">
+                        {poll.category}
+                      </span>
+                    )}
                     <span
                       className={`text-[8px] px-2 py-0.5 rounded font-black uppercase border ${
                         poll.status === "active"
@@ -290,14 +346,23 @@ export default function PollsPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {poll.options.map((opt, idx) => {
-                    const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                    return (
-                      <div key={idx} className="space-y-1 text-xs">
-                        <div className="flex justify-between items-center">
-                          <span className="text-white/80">{opt.label}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white/40 font-mono">{opt.votes} votes ({pct}%)</span>
+                  {poll.options === null ? (
+                    <div className="space-y-3 py-1">
+                      <div className="space-y-2">
+                        <div className="h-4 bg-white/5 rounded animate-pulse w-full" />
+                        <div className="h-1.5 bg-white/5 rounded-full animate-pulse w-full" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-white/5 rounded animate-pulse w-5/6" />
+                        <div className="h-1.5 bg-white/5 rounded-full animate-pulse w-5/6" />
+                      </div>
+                    </div>
+                  ) : poll.choicesHidden ? (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        {poll.options.map((opt, idx) => (
+                          <div key={idx} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-b-0 last:pb-0 text-xs">
+                            <span className="text-white/80">{opt.label}</span>
                             {canVote && (
                               <button
                                 onClick={() => handleVote(poll.id, idx)}
@@ -307,16 +372,42 @@ export default function PollsPage() {
                               </button>
                             )}
                           </div>
-                        </div>
-                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                      <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl text-[10px] text-primary leading-normal flex items-start gap-1.5">
+                        <Lock className="w-3.5 h-3.5 shrink-0 text-primary mt-0.5" />
+                        <span>Encrypted Zero-Knowledge Tallies active. Results decrypted after close.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    poll.options.map((opt, idx) => {
+                      const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+                      return (
+                        <div key={idx} className="space-y-1 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/80">{opt.label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-white/40 font-mono">{opt.votes} votes ({pct}%)</span>
+                              {canVote && (
+                                <button
+                                  onClick={() => handleVote(poll.id, idx)}
+                                  className="px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-all cursor-pointer"
+                                >
+                                  Vote
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Footer info & operations */}

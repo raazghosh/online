@@ -42,6 +42,7 @@ export interface UserSession {
   lastName?: string;
   orgName?: string;
   phone?: string;
+  avatarUrl?: string;
 }
 
 interface VotingState {
@@ -104,6 +105,7 @@ async function buildUserDetails(
     const profile = await apiGetOrgMe();
     const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
     const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
+    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${profile.Email}`) : null;
     return {
       username: savedUsername || profile.OrgName || "Org Owner",
       email: profile.Email,
@@ -112,11 +114,13 @@ async function buildUserDetails(
       orgName: profile.OrgName,
       emailVerified: profile.EmailVerified,
       phone: savedPhone || "",
+      avatarUrl: savedAvatar || profile.AvatarURL || "",
     };
   } else {
     const profile = await apiGetMe();
     const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
     const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
+    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${profile.Email}`) : null;
     return {
       username: savedUsername || `${profile.FirstName} ${profile.LastName}`.trim() || "Voter",
       email: profile.Email,
@@ -126,6 +130,7 @@ async function buildUserDetails(
       lastName: profile.LastName,
       emailVerified: profile.EmailVerified,
       phone: savedPhone || "",
+      avatarUrl: savedAvatar || profile.AvatarURL || "",
     };
   }
 }
