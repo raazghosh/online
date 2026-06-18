@@ -230,7 +230,69 @@ export default function CreateElectionPage() {
         <p className="text-xs text-white/50">Setup ballot choices, list voters, and launch decentralized elections.</p>
       </div>
 
-      {errorMessage && (
+      {errorMessage === "Failed to resolve creator verification" ? (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3 text-amber-400 text-xs">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white">Backend Creator Verification Offline</p>
+              <p className="mt-1 text-white/70">
+                The platform&apos;s inter-service verification resolver is currently unavailable (known backend configuration token mismatch). 
+                To proceed, you can launch this as a <strong>Public Election</strong> without sending email invitations.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button
+              onClick={async () => {
+                // Retry without email invites
+                setErrorMessage("");
+                setIsPublishing(true);
+                try {
+                  const options = candidates.map(c => c.name.trim()).filter(Boolean);
+                  let finalStart: string | undefined = undefined;
+                  let finalEnd: string | undefined = undefined;
+                  if (startDate) {
+                    let startD = new Date(startDate);
+                    const minStart = new Date(Date.now() + 15000);
+                    if (startD < minStart) startD = minStart;
+                    finalStart = startD.toISOString();
+                    if (endDate) {
+                      let endD = new Date(endDate);
+                      if (endD <= startD) endD = new Date(startD.getTime() + 60000);
+                      finalEnd = endD.toISOString();
+                    }
+                  }
+                  const body = {
+                    title,
+                    description,
+                    options,
+                    allow_admin_vote: true,
+                    voting_start_at: finalStart,
+                    voting_end_at: finalEnd,
+                    auto_start: false,
+                    visibility: "public" as const,
+                    client_request_id: `web-create-${Date.now()}`
+                  };
+                  const res = await apiCreatePoll(body);
+                  useVotingStore.getState().addCreatedPollId(res.poll.id);
+                  setPublishSuccess(true);
+                  setTimeout(() => {
+                    router.push("/feed/elections");
+                  }, 1500);
+                } catch (err: any) {
+                  setErrorMessage(err.message || "Failed to create election.");
+                } finally {
+                  setIsPublishing(false);
+                }
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
+            >
+              Publish as Public Election
+            </Button>
+          </div>
+        </div>
+      ) : errorMessage && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 text-red-400 text-xs">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{errorMessage}</span>
