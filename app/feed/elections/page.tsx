@@ -36,7 +36,8 @@ import {
   apiStartPoll,
   apiEndPoll,
   apiCastVote,
-  decodeJwt
+  decodeJwt,
+  parsePollDescription
 } from "@/lib/api";
 
 function ElectionsPageContent() {
@@ -90,10 +91,11 @@ function ElectionsPageContent() {
 
           const totalVotes = resultsData?.total_votes || 0;
 
+          const parsed = parsePollDescription(data.description);
           return {
             id: data.id,
             title: data.title,
-            description: data.description || "No description provided.",
+            description: parsed.description || "No description provided.",
             category: data.allow_admin_vote ? "Admin Allowed" : "Standard",
             status: data.status === "active" ? "Active" : data.status === "ended" ? "Completed" : "Scheduled",
             votes: totalVotes,
@@ -102,6 +104,8 @@ function ElectionsPageContent() {
             endDate: data.voting_end_at ? new Date(data.voting_end_at).toLocaleString() : "Manual",
             adminId: data.admin_id,
             options: data.options || [],
+            isPrivate: parsed.isPrivate,
+            allowedEmails: parsed.allowedEmails,
             candidates: (data.options || []).map((opt: string) => {
               const count = resultsData?.votes?.[opt] || 0;
               return {
@@ -211,6 +215,16 @@ function ElectionsPageContent() {
     setErrorMessage("");
     try {
       const data = await apiGetPoll(trimmedId);
+      
+      // Access control check for import:
+      const parsed = parsePollDescription(data.description);
+      if (parsed.isPrivate && data.admin_id !== currentUserId) {
+        const userEmail = user?.email?.toLowerCase();
+        if (!userEmail || !parsed.allowedEmails.includes(userEmail)) {
+          throw new Error("Access Denied: You are not authorized to view or participate in this private election.");
+        }
+      }
+
       addVotedPollId(data.id);
       setSearchQuery("");
       alert(`Successfully imported poll: ${data.title}`);
@@ -226,6 +240,13 @@ function ElectionsPageContent() {
   };
 
   const filteredElections = elections.filter((e) => {
+    // Access control check: If simulated private, user must be owner or allowed email
+    if (e.isPrivate && e.adminId !== currentUserId) {
+      const userEmail = user?.email?.toLowerCase();
+      if (!userEmail || !e.allowedEmails.includes(userEmail)) {
+        return false; // Hide from feed
+      }
+    }
     const matchesSearch =
       e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.description.toLowerCase().includes(searchQuery.toLowerCase());

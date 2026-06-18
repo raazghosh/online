@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useVotingStore } from "@/store/useVotingStore";
 import { Button } from "@/components/ui/button";
-import { apiGetPoll, apiGetResults } from "@/lib/api";
+import { apiGetPoll, apiGetResults, parsePollDescription, decodeJwt } from "@/lib/api";
 
 interface CandidateResult {
   label: string;
@@ -44,7 +44,14 @@ interface UIResult {
 
 function ResultsPageContent() {
   const searchParams = useSearchParams();
-  const { user, createdPollIds, votedPollIds, isInitialized, initializeSession } = useVotingStore();
+  const { user, accessToken, createdPollIds, votedPollIds, isInitialized, initializeSession } = useVotingStore();
+  
+  // Decode current user ID from JWT
+  let currentUserId = "";
+  if (accessToken) {
+    const decoded = decodeJwt(accessToken);
+    currentUserId = decoded?.user_id || "";
+  }
 
   const [pollList, setPollList] = useState<{ id: string; title: string }[]>([]);
   const [selectedElection, setSelectedElection] = useState("");
@@ -70,6 +77,14 @@ function ResultsPageContent() {
         uniquePollIds.map(async (id) => {
           try {
             const data = await apiGetPoll(id);
+            // Access control check: If simulated private, user must be owner or allowed email
+            const parsed = parsePollDescription(data.description);
+            if (parsed.isPrivate && data.admin_id !== currentUserId) {
+              const userEmail = user?.email?.toLowerCase();
+              if (!userEmail || !parsed.allowedEmails.includes(userEmail)) {
+                return null; // Skip private polls they aren't invited to
+              }
+            }
             return { id: data.id, title: data.title };
           } catch {
             return null; // Skip deleted or inaccessible polls
@@ -89,7 +104,7 @@ function ResultsPageContent() {
     };
 
     loadPollList();
-  }, [isInitialized, user, createdPollIds, votedPollIds, searchParams]);
+  }, [isInitialized, user, currentUserId, createdPollIds, votedPollIds, searchParams]);
 
   // Fetch results for selected poll
   const loadSelectedResults = React.useCallback(async () => {
@@ -98,6 +113,16 @@ function ResultsPageContent() {
     setErrorMessage("");
     try {
       const data = await apiGetPoll(selectedElection);
+      
+      // Access control check for results page:
+      const parsed = parsePollDescription(data.description);
+      if (parsed.isPrivate && data.admin_id !== currentUserId) {
+        const userEmail = user?.email?.toLowerCase();
+        if (!userEmail || !parsed.allowedEmails.includes(userEmail)) {
+          throw new Error("Access Denied: You are not authorized to view this private election's results.");
+        }
+      }
+
       let resultsData = null;
       try {
         resultsData = await apiGetResults(selectedElection);
@@ -143,7 +168,7 @@ function ResultsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [selectedElection]);
+  }, [selectedElection, currentUserId, user]);
 
   useEffect(() => {
     loadSelectedResults();

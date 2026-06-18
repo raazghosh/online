@@ -551,4 +551,27 @@ export async function apiSearchUsers(query: string) {
   return handleApiResponse(res);
 }
 
+export function parsePollDescription(rawDescription: string = "") {
+  const match = rawDescription.match(/\n\n\[Metadata: ({[\s\S]*?})\]$/);
+  if (match) {
+    try {
+      const metadata = JSON.parse(match[1]);
+      const cleanDesc = rawDescription.replace(/\n\n\[Metadata: ({[\s\S]*?})\]$/, "");
+      return {
+        description: cleanDesc,
+        isPrivate: !!metadata.private,
+        allowedEmails: metadata.allowed_emails || [],
+      };
+    } catch {
+      // ignore
+    }
+  }
+  return {
+    description: rawDescription,
+    isPrivate: false,
+    allowedEmails: [],
+  };
+}
+
+
 
