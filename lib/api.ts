@@ -544,3 +544,11 @@ export async function apiUpdateTeamMemberRole(teamId: string, userId: string, ro
   return handleApiResponse(res);
 }
 
+export async function apiSearchUsers(query: string) {
+  const res = await authFetch(`${AUTH_API_URL}/auth/users/search?q=${encodeURIComponent(query)}&limit=1`, {
+    method: "GET",
+  });
+  return handleApiResponse(res);
+}
+
+

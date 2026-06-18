@@ -21,7 +21,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiCreatePoll, apiGetTeams, apiGetTeamMembers } from "@/lib/api";
+import { apiCreatePoll, apiGetTeams, apiGetTeamMembers, apiSearchUsers } from "@/lib/api";
 import { useVotingStore } from "@/store/useVotingStore";
 import { useEffect } from "react";
 
@@ -34,6 +34,8 @@ export default function CreateElectionPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
+  const [skippedVoters, setSkippedVoters] = useState<string[]>([]);
+  const [isFallbackPublished, setIsFallbackPublished] = useState(false);
 
   // Form states
   // Step 1: Details
@@ -73,7 +75,8 @@ export default function CreateElectionPage() {
                 }
                 return {
                   name: fullName,
-                  email: userObj.email || m.email || ""
+                  email: userObj.email || m.email || "",
+                  userId: m.user_id || userObj.id || m.id || ""
                 };
               }).filter((m: any) => m.email);
               setTeamMembers(mapped);
@@ -124,14 +127,17 @@ export default function CreateElectionPage() {
   const handlePublish = async () => {
     setIsPublishing(true);
     setErrorMessage("");
+    setSkippedVoters([]);
+    setIsFallbackPublished(false);
+    let emailInvites: { email: string }[] = [];
+    let options: string[] = [];
+    let finalStart: string | undefined = undefined;
+    let finalEnd: string | undefined = undefined;
     try {
-      const options = candidates.map(c => c.name.trim()).filter(Boolean);
+      options = candidates.map(c => c.name.trim()).filter(Boolean);
       if (options.length < 2) {
         throw new Error("An election must have at least two choices/candidates.");
       }
-
-      let finalStart: string | undefined = undefined;
-      let finalEnd: string | undefined = undefined;
 
       if (startDate) {
         let startD = new Date(startDate);
@@ -151,7 +157,6 @@ export default function CreateElectionPage() {
       }
 
       // Parse voter invitations based on selected method
-      let emailInvites: { email: string }[] = [];
       if (voterMethod === "manual") {
         emailInvites = manualVoters
           .split(/[\n,;]+/)
@@ -196,7 +201,93 @@ export default function CreateElectionPage() {
         router.push("/feed/elections");
       }, 1500);
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to create election.");
+      const isCreatorVerificationErr = err.message?.trim().replace(/\.$/, "").toLowerCase() === "failed to resolve creator verification";
+      if (isCreatorVerificationErr && emailInvites.length > 0) {
+        setErrorMessage("Platform verification resolver is offline. Resolving registered voter accounts for private access...");
+        try {
+          const resolvedSubjects: { id: string; account_type: "user" }[] = [];
+          const unresolvedEmails: string[] = [];
+
+          if (voterMethod === "team") {
+            emailInvites.forEach((invite) => {
+              const member = teamMembers.find((m) => m.email.toLowerCase() === invite.email.toLowerCase());
+              if (member && member.userId) {
+                resolvedSubjects.push({
+                  id: String(member.userId),
+                  account_type: "user",
+                });
+              } else {
+                unresolvedEmails.push(invite.email);
+              }
+            });
+          } else {
+            // Resolve using search API in parallel
+            await Promise.all(
+              emailInvites.map(async (invite) => {
+                try {
+                  const searchRes = await apiSearchUsers(invite.email);
+                  if (searchRes && searchRes.data && searchRes.data.length > 0) {
+                    const match = searchRes.data.find(
+                      (u: any) => u.email.toLowerCase() === invite.email.toLowerCase()
+                    );
+                    if (match) {
+                      resolvedSubjects.push({
+                        id: String(match.id),
+                        account_type: "user",
+                      });
+                      return;
+                    }
+                  }
+                  unresolvedEmails.push(invite.email);
+                } catch {
+                  unresolvedEmails.push(invite.email);
+                }
+              })
+            );
+          }
+
+          // Build a new request body with poll_tags and strip email_invites
+          let pollTags: any = undefined;
+          if (resolvedSubjects.length > 0) {
+            pollTags = { subjects: resolvedSubjects };
+          }
+
+          const retryBody = {
+            title,
+            description,
+            options,
+            allow_admin_vote: true,
+            voting_start_at: finalStart,
+            voting_end_at: finalEnd,
+            auto_start: false,
+            visibility: "private" as const, // Maintain private status!
+            poll_tags: pollTags,
+            client_request_id: `web-create-fallback-${Date.now()}`
+          };
+
+          const res = await apiCreatePoll(retryBody);
+
+          // Save to Zustand store
+          useVotingStore.getState().addCreatedPollId(res.poll.id);
+
+          setSkippedVoters(unresolvedEmails);
+          setIsFallbackPublished(true);
+          setPublishSuccess(true);
+          setErrorMessage(""); // clear error since it succeeded!
+          
+          // Only auto-redirect if there are no skipped emails to show
+          if (unresolvedEmails.length === 0) {
+            setTimeout(() => {
+              router.push("/feed/elections");
+            }, 1500);
+          }
+          return;
+        } catch (retryErr: any) {
+          setErrorMessage(retryErr.message || "Failed to create private election in fallback mode.");
+        }
+      } else {
+        setErrorMessage(err.message || "Failed to create election.");
+      }
     } finally {
       setIsPublishing(false);
     }
@@ -230,7 +321,7 @@ export default function CreateElectionPage() {
         <p className="text-xs text-white/50">Setup ballot choices, list voters, and launch decentralized elections.</p>
       </div>
 
-      {errorMessage === "Failed to resolve creator verification" ? (
+      {errorMessage?.trim().replace(/\.$/, "").toLowerCase() === "failed to resolve creator verification" ? (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3 text-amber-400 text-xs">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -238,14 +329,139 @@ export default function CreateElectionPage() {
               <p className="font-bold text-white">Backend Creator Verification Offline</p>
               <p className="mt-1 text-white/70">
                 The platform&apos;s inter-service verification resolver is currently unavailable (known backend configuration token mismatch). 
-                To proceed, you can launch this as a <strong>Public Election</strong> without sending email invitations.
+                To proceed, you can either launch this as a **Private Election** (resolved voters will be tagged, unregistered will be skipped) or as a **Public Election** (without access restrictions).
               </p>
             </div>
           </div>
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end gap-2.5 pt-1">
             <Button
               onClick={async () => {
-                // Retry without email invites
+                // Retry as private in fallback mode
+                setErrorMessage("");
+                setIsPublishing(true);
+                setSkippedVoters([]);
+                setIsFallbackPublished(false);
+                try {
+                  const options = candidates.map(c => c.name.trim()).filter(Boolean);
+                  let finalStart: string | undefined = undefined;
+                  let finalEnd: string | undefined = undefined;
+                  if (startDate) {
+                    let startD = new Date(startDate);
+                    const minStart = new Date(Date.now() + 15000);
+                    if (startD < minStart) startD = minStart;
+                    finalStart = startD.toISOString();
+                    if (endDate) {
+                      let endD = new Date(endDate);
+                      if (endD <= startD) endD = new Date(startD.getTime() + 60000);
+                      finalEnd = endD.toISOString();
+                    }
+                  }
+
+                  let emailInvites: { email: string }[] = [];
+                  if (voterMethod === "manual") {
+                    emailInvites = manualVoters
+                      .split(/[\n,;]+/)
+                      .map(e => e.trim())
+                      .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                      .map(email => ({ email }));
+                  } else if (voterMethod === "csv" && csvFile) {
+                    try {
+                      const text = await csvFile.text();
+                      emailInvites = text
+                        .split(/\r?\n/)
+                        .map(line => line.split(",")[0]?.trim())
+                        .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                        .map(email => ({ email }));
+                    } catch {
+                      throw new Error("Failed to parse CSV file. Ensure it has email addresses in the first column.");
+                    }
+                  } else if (voterMethod === "team") {
+                    emailInvites = selectedTeamEmails.map(email => ({ email }));
+                  }
+
+                  const resolvedSubjects: { id: string; account_type: "user" }[] = [];
+                  const unresolvedEmails: string[] = [];
+
+                  if (voterMethod === "team") {
+                    emailInvites.forEach((invite) => {
+                      const member = teamMembers.find((m) => m.email.toLowerCase() === invite.email.toLowerCase());
+                      if (member && member.userId) {
+                        resolvedSubjects.push({
+                          id: String(member.userId),
+                          account_type: "user",
+                        });
+                      } else {
+                        unresolvedEmails.push(invite.email);
+                      }
+                    });
+                  } else {
+                    await Promise.all(
+                      emailInvites.map(async (invite) => {
+                        try {
+                          const searchRes = await apiSearchUsers(invite.email);
+                          if (searchRes && searchRes.data && searchRes.data.length > 0) {
+                            const match = searchRes.data.find(
+                              (u: any) => u.email.toLowerCase() === invite.email.toLowerCase()
+                            );
+                            if (match) {
+                              resolvedSubjects.push({
+                                id: String(match.id),
+                                account_type: "user",
+                              });
+                              return;
+                            }
+                          }
+                          unresolvedEmails.push(invite.email);
+                        } catch {
+                          unresolvedEmails.push(invite.email);
+                        }
+                      })
+                    );
+                  }
+
+                  let pollTags: any = undefined;
+                  if (resolvedSubjects.length > 0) {
+                    pollTags = { subjects: resolvedSubjects };
+                  }
+
+                  const retryBody = {
+                    title,
+                    description,
+                    options,
+                    allow_admin_vote: true,
+                    voting_start_at: finalStart,
+                    voting_end_at: finalEnd,
+                    auto_start: false,
+                    visibility: "private" as const,
+                    poll_tags: pollTags,
+                    client_request_id: `web-create-fallback-${Date.now()}`
+                  };
+
+                  const res = await apiCreatePoll(retryBody);
+                  useVotingStore.getState().addCreatedPollId(res.poll.id);
+
+                  setSkippedVoters(unresolvedEmails);
+                  setIsFallbackPublished(true);
+                  setPublishSuccess(true);
+                  
+                  if (unresolvedEmails.length === 0) {
+                    setTimeout(() => {
+                      router.push("/feed/elections");
+                    }, 1500);
+                  }
+                } catch (retryErr: any) {
+                  setErrorMessage(retryErr.message || "Failed to create private election in fallback mode.");
+                } finally {
+                  setIsPublishing(false);
+                }
+              }}
+              className="bg-primary hover:bg-primary/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
+            >
+              Publish as Private (Fallback Mode)
+            </Button>
+            <Button
+              onClick={async () => {
+                // Retry without email invites (as public)
                 setErrorMessage("");
                 setIsPublishing(true);
                 try {
@@ -272,7 +488,7 @@ export default function CreateElectionPage() {
                     voting_end_at: finalEnd,
                     auto_start: false,
                     visibility: "public" as const,
-                    client_request_id: `web-create-${Date.now()}`
+                    client_request_id: `web-create-public-${Date.now()}`
                   };
                   const res = await apiCreatePoll(body);
                   useVotingStore.getState().addCreatedPollId(res.poll.id);
@@ -627,12 +843,47 @@ export default function CreateElectionPage() {
               )}
 
               {publishSuccess && (
-                <div className="absolute inset-0 bg-[#050816] z-30 flex flex-col items-center justify-center gap-3 text-center">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                    <CheckCircle className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-bold text-white">Election Successfully Launched</h3>
-                  <p className="text-xs text-white/50">Decentralized hashes generated and verified.</p>
+                <div className="absolute inset-0 bg-[#050816] z-30 flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
+                  {skippedVoters.length > 0 ? (
+                    <div className="space-y-4 max-w-md w-full">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <AlertCircle className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">Election Launched (Fallback Mode)</h3>
+                      <p className="text-xs text-white/70 leading-relaxed">
+                        The election was successfully published as **Private**. Registered users were verified and granted direct access via cryptographic poll tags.
+                      </p>
+                      
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 text-left space-y-2">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-amber-400">
+                          Offline Invitations (Skipped - {skippedVoters.length})
+                        </p>
+                        <p className="text-[9px] text-white/50 leading-normal">
+                          The backend verification resolver is offline, so invitations for these emails could not be sent. They must register first to gain access:
+                        </p>
+                        <div className="max-h-24 overflow-y-auto font-mono text-[9px] text-white/80 space-y-1 divide-y divide-white/5">
+                          {skippedVoters.map((email, index) => (
+                            <div key={index} className="pt-1 first:pt-0">{email}</div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => router.push("/feed/elections")}
+                        className="w-full bg-primary hover:bg-primary/95 text-white font-bold text-xs py-3 rounded-xl mt-2 cursor-pointer"
+                      >
+                        Go to Elections List
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <CheckCircle className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">Election Successfully Launched</h3>
+                      <p className="text-xs text-white/50">Decentralized hashes generated and verified.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
