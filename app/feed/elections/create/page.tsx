@@ -32,7 +32,7 @@ interface Candidate {
 
 export default function CreateElectionPage() {
   const router = useRouter();
-  const { user } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
   const [step, setStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
   const [skippedVoters, setSkippedVoters] = useState<string[]>([]);

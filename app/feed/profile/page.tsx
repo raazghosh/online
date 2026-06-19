@@ -36,7 +36,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isInitialized } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"details" | "subscription" | "billing" | "security">("details");
@@ -248,11 +249,11 @@ export default function ProfilePage() {
   return (
     <div className="space-y-8 select-none max-w-6xl mx-auto pb-12">
       {/* Banner / Cover Hero Area */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-card/20 backdrop-blur-md">
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-card">
         {/* Colorful Mesh Glow Background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/10 to-emerald-500/10 pointer-events-none -z-10" />
-        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-primary/20 blur-[100px] pointer-events-none -z-10" />
-        <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-accent/20 blur-[100px] pointer-events-none -z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-accent/5 to-emerald-500/5 pointer-events-none -z-10" />
+        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full glow-primary-lg pointer-events-none -z-10" />
+        <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full glow-accent-lg pointer-events-none -z-10" />
         <div className="absolute inset-0 grid-bg opacity-[0.2] pointer-events-none -z-20" />
 
         <div className="p-6 sm:p-8 flex flex-col md:flex-row items-center gap-6 relative">
@@ -326,7 +327,7 @@ export default function ProfilePage() {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="md:max-w-xs w-full bg-amber-500/10 border border-amber-500/25 p-4 rounded-2xl flex flex-col gap-2.5 justify-between backdrop-blur-sm self-stretch md:self-auto"
+              className="md:max-w-xs w-full bg-amber-500/10 border border-amber-500/25 p-4 rounded-2xl flex flex-col gap-2.5 justify-between self-stretch md:self-auto"
             >
               <div className="flex gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
@@ -349,7 +350,7 @@ export default function ProfilePage() {
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="md:max-w-xs w-full bg-emerald-500/10 border border-emerald-500/25 p-4 rounded-2xl flex flex-col gap-2.5 justify-between backdrop-blur-sm self-stretch md:self-auto"
+              className="md:max-w-xs w-full bg-emerald-500/10 border border-emerald-500/25 p-4 rounded-2xl flex flex-col gap-2.5 justify-between self-stretch md:self-auto"
             >
               <div className="flex gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -406,7 +407,7 @@ export default function ProfilePage() {
             >
               {/* Form Card */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-6">
+                <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-6">
                   <div className="flex items-center justify-between border-b border-white/5 pb-4">
                     <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                       <User className="w-4 h-4 text-primary" /> Profile Credentials
@@ -609,7 +610,7 @@ export default function ProfilePage() {
 
               {/* Side Stats Card */}
               <div className="space-y-6">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-5">
+                <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-5">
                   <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                     <Fingerprint className="w-4 h-4 text-primary" /> Security Metadata
                   </h2>
@@ -674,7 +675,7 @@ export default function ProfilePage() {
               className="grid grid-cols-1 md:grid-cols-12 gap-6"
             >
               {/* Plan info */}
-              <div className="md:col-span-8 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-6">
+              <div className="md:col-span-8 bg-card border border-white/10 rounded-3xl p-6 space-y-6">
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                     <Zap className="w-4 h-4 text-primary" /> Current Subscription Details
@@ -709,7 +710,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Sidebar Upgrade Info */}
-              <div className="md:col-span-4 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-4">
+              <div className="md:col-span-4 bg-card border border-white/10 rounded-3xl p-6 flex flex-col justify-between space-y-4">
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-amber-400" /> Professional Grade
@@ -735,7 +736,7 @@ export default function ProfilePage() {
               className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
               {/* Table */}
-              <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-5">
+              <div className="lg:col-span-2 bg-card border border-white/10 rounded-3xl p-6 space-y-5">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <History className="w-4 h-4 text-primary" /> Invoice History
                 </h2>
@@ -775,7 +776,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Card settings */}
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-5">
+              <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-5">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-primary" /> Billing Details
                 </h3>
@@ -814,7 +815,7 @@ export default function ProfilePage() {
               className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
               {/* Toggles */}
-              <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-6">
+              <div className="lg:col-span-2 bg-card border border-white/10 rounded-3xl p-6 space-y-6">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <Lock className="w-4 h-4 text-primary" /> Security & Identity Settings
                 </h2>
@@ -882,7 +883,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Password update helper */}
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+              <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Fingerprint className="w-4 h-4 text-primary" /> Cryptographic Signatures
                 </h3>

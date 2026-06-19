@@ -44,7 +44,12 @@ interface UIResult {
 
 function ResultsPageContent() {
   const searchParams = useSearchParams();
-  const { user, accessToken, createdPollIds, votedPollIds, isInitialized, initializeSession } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const accessToken = useVotingStore((state) => state.accessToken);
+  const createdPollIds = useVotingStore((state) => state.createdPollIds);
+  const votedPollIds = useVotingStore((state) => state.votedPollIds);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
   
   // Decode current user ID from JWT
   let currentUserId = "";
@@ -250,7 +255,7 @@ function ResultsPageContent() {
         /* Main Results Grid */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Votes Count & Ranking */}
-          <div className="lg:col-span-8 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-6">
+          <div className="lg:col-span-8 bg-card border border-white/10 rounded-3xl p-6 space-y-6">
             <div className="border-b border-white/5 pb-4 flex justify-between items-center">
               <div>
                 <h2 className="text-base font-bold text-white">Ballot Tallies & Rankings</h2>
@@ -299,7 +304,7 @@ function ResultsPageContent() {
           {/* Participation Stats & Audit Logs */}
           <div className="lg:col-span-4 space-y-6">
             {/* Participation Metrics */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+            <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
               <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider">Participation Metrics</h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl text-center">
@@ -318,7 +323,7 @@ function ResultsPageContent() {
             </div>
 
             {/* Audit Node Ledger */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+            <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
               <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
                 <Cpu className="w-4 h-4 text-primary" /> Consensus Ledger Nodes
               </h3>

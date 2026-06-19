@@ -121,6 +121,26 @@
   border: 1px solid var(--glass-border);
 }
 
+/* Zero-blur radial gradient glow effects for visual performance */
+.glow-primary-lg {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--primary) 10%, transparent) 0%, transparent 70%);
+}
+.glow-accent-lg {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 70%);
+}
+.glow-primary-md {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--primary) 15%, transparent) 0%, transparent 65%);
+}
+.glow-accent-md {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 65%);
+}
+.glow-primary-sm {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--primary) 20%, transparent) 0%, transparent 60%);
+}
+.glow-accent-sm {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 20%, transparent) 0%, transparent 60%);
+}
+
 .premium-glow {
   position: relative;
 }

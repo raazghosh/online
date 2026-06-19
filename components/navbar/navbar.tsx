@@ -17,7 +17,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { theme, setTheme } = useTheme();
-  const { user, logout } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const logout = useVotingStore((state) => state.logout);
 
   useEffect(() => {
     setMounted(true);

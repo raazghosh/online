@@ -37,12 +37,15 @@ export interface UserSession {
   email: string;
   role: "admin" | "voter";
   isVerified: boolean;
-  emailVerified?: boolean;
+    emailVerified?: boolean;
   firstName?: string;
   lastName?: string;
   orgName?: string;
   phone?: string;
   avatarUrl?: string;
+  displayName?: string;
+  bio?: string;
+  socialLinks?: Array<{ platform: string; handle: string }>;
 }
 
 interface VotingState {
@@ -103,27 +106,58 @@ async function buildUserDetails(
 ): Promise<UserSession> {
   if (accountType === "organization") {
     const profile = await apiGetOrgMe();
-    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
-    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
-    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${profile.Email}`) : null;
+    const email = profile.Email;
+    
+    // Load fallbacks from localStorage for mock/simulation endpoints compatibility
+    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${email}`) : null;
+    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${email}`) : null;
+    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${email}`) : null;
+    const savedDisplayName = typeof window !== "undefined" ? localStorage.getItem(`display_name_${email}`) : null;
+    const savedBio = typeof window !== "undefined" ? localStorage.getItem(`bio_${email}`) : null;
+    
+    let savedSocialLinks = [];
+    try {
+      const links = typeof window !== "undefined" ? localStorage.getItem(`social_links_${email}`) : null;
+      savedSocialLinks = links ? JSON.parse(links) : [];
+    } catch {
+      savedSocialLinks = [];
+    }
+
     return {
       username: savedUsername || profile.OrgName || "Org Owner",
-      email: profile.Email,
+      email: email,
       role: "admin",
       isVerified: profile.IsVerified,
       orgName: profile.OrgName,
       emailVerified: profile.EmailVerified,
       phone: savedPhone || "",
       avatarUrl: savedAvatar || profile.AvatarURL || "",
+      displayName: savedDisplayName || profile.OrgName || "Org Owner",
+      bio: savedBio || "Decentralized organization node administrator.",
+      socialLinks: savedSocialLinks,
     };
   } else {
     const profile = await apiGetMe();
-    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${profile.Email}`) : null;
-    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${profile.Email}`) : null;
-    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${profile.Email}`) : null;
+    const email = profile.Email;
+    
+    // Load fallbacks from localStorage
+    const savedUsername = typeof window !== "undefined" ? localStorage.getItem(`username_${email}`) : null;
+    const savedPhone = typeof window !== "undefined" ? localStorage.getItem(`phone_${email}`) : null;
+    const savedAvatar = typeof window !== "undefined" ? localStorage.getItem(`avatar_${email}`) : null;
+    const savedDisplayName = typeof window !== "undefined" ? localStorage.getItem(`display_name_${email}`) : null;
+    const savedBio = typeof window !== "undefined" ? localStorage.getItem(`bio_${email}`) : null;
+    
+    let savedSocialLinks = [];
+    try {
+      const links = typeof window !== "undefined" ? localStorage.getItem(`social_links_${email}`) : null;
+      savedSocialLinks = links ? JSON.parse(links) : [];
+    } catch {
+      savedSocialLinks = [];
+    }
+
     return {
-      username: savedUsername || `${profile.FirstName} ${profile.LastName}`.trim() || "Voter",
-      email: profile.Email,
+      username: savedUsername || `${profile.FirstName}_${profile.LastName}`.toLowerCase().replace(/\s+/g, "") || "voter",
+      email: email,
       role: "voter",
       isVerified: profile.IsVerified,
       firstName: profile.FirstName,
@@ -131,6 +165,9 @@ async function buildUserDetails(
       emailVerified: profile.EmailVerified,
       phone: savedPhone || "",
       avatarUrl: savedAvatar || profile.AvatarURL || "",
+      displayName: savedDisplayName || `${profile.FirstName} ${profile.LastName}`.trim() || "Voter",
+      bio: savedBio || "Decentralized democracy participant.",
+      socialLinks: savedSocialLinks,
     };
   }
 }

@@ -41,7 +41,9 @@ import {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, isInitialized, initializeSession } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -341,8 +343,8 @@ export default function OnboardingPage() {
   return (
     <div className="relative min-h-screen bg-[#050816] text-white flex flex-col justify-between select-none overflow-x-hidden">
       {/* Glow Effects */}
-      <div className="absolute top-[10%] left-[-15%] w-[50vw] h-[50vw] rounded-full bg-primary/10 blur-[130px] pointer-events-none -z-10" />
-      <div className="absolute bottom-[10%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-accent/10 blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute top-[10%] left-[-15%] w-[50vw] h-[50vw] rounded-full glow-primary-lg pointer-events-none -z-10" />
+      <div className="absolute bottom-[10%] right-[-15%] w-[50vw] h-[50vw] rounded-full glow-accent-lg pointer-events-none -z-10" />
       <div className="absolute inset-0 grid-bg opacity-[0.2] pointer-events-none -z-20" />
 
       {/* Top Header */}
@@ -405,10 +407,9 @@ export default function OnboardingPage() {
           })}
         </div>
 
-        {/* Form Card */}
-        <div className="w-full bg-white/5 border border-white/10 rounded-3xl p-6 md:p-10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden min-h-[420px] flex flex-col justify-between">
-          <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full bg-primary/10 blur-[60px] pointer-events-none -z-10" />
-          <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full bg-accent/10 blur-[60px] pointer-events-none -z-10" />
+        <div className="w-full bg-card border border-white/10 rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden min-h-[420px] flex flex-col justify-between">
+          <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full glow-primary-sm pointer-events-none -z-10" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full glow-accent-sm pointer-events-none -z-10" />
 
           <AnimatePresence mode="wait">
             {/* Step 1: Profile */}

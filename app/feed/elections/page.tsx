@@ -44,7 +44,11 @@ import {
 function ElectionsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, accessToken, createdPollIds, votedPollIds, addVotedPollId } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const accessToken = useVotingStore((state) => state.accessToken);
+  const createdPollIds = useVotingStore((state) => state.createdPollIds);
+  const votedPollIds = useVotingStore((state) => state.votedPollIds);
+  const addVotedPollId = useVotingStore((state) => state.addVotedPollId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -372,7 +376,7 @@ function ElectionsPageContent() {
           Array.from({ length: 3 }).map((_, idx) => (
             <div
               key={idx}
-              className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-sm space-y-4 animate-pulse"
+              className="bg-card border border-white/10 rounded-2xl p-5 md:p-6 space-y-4 animate-pulse"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-2 flex-1">
@@ -408,7 +412,7 @@ function ElectionsPageContent() {
             return (
               <div
                 key={elec.id}
-                className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-sm space-y-4 hover:border-white/15 transition-all"
+                className="bg-card border border-white/10 rounded-2xl p-5 md:p-6 space-y-4 hover:border-white/15 transition-all"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">

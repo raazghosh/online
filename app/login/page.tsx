@@ -26,7 +26,10 @@ import { apiForgotPasswordSendOtp, apiForgotPasswordVerifyOtp, apiForgotPassword
 
 function LoginPageContent() {
   const router = useRouter();
-  const { login, user, isInitialized, initializeSession } = useVotingStore();
+  const login = useVotingStore((state) => state.login);
+  const user = useVotingStore((state) => state.user);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
 
   const [accountType, setAccountType] = useState<"individual" | "organization">("individual");
   
@@ -280,8 +283,8 @@ function LoginPageContent() {
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 select-none">
       {/* Background Glow Elements */}
-      <div className="absolute top-[10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/10 blur-[130px] animate-pulse-slow pointer-events-none -z-10" />
-      <div className="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-accent/10 blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute top-[10%] left-[-10%] w-[40vw] h-[40vw] rounded-full glow-primary-lg animate-pulse-slow pointer-events-none -z-10" />
+      <div className="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] rounded-full glow-accent-lg pointer-events-none -z-10" />
       
       {/* Grid Overlay */}
       <div className="absolute inset-0 grid-bg opacity-[0.3] pointer-events-none -z-20" />
@@ -343,7 +346,7 @@ function LoginPageContent() {
 
           {/* Floating Indicators */}
           <motion.div variants={itemVariants} className="space-y-4 relative">
-            <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full -z-10" />
+            <div className="absolute inset-0 glow-primary-md rounded-full -z-10" />
 
             <div className="glassmorphism p-4 rounded-2xl border border-white/10 flex items-center gap-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.15)] max-w-sm">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
@@ -394,9 +397,9 @@ function LoginPageContent() {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="w-full max-w-xl bg-white/5 backdrop-blur-[20px] rounded-[24px] border border-white/8 hover:border-white/12 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden p-6 sm:p-8 md:p-10 group transition-all duration-300">
-            <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-primary/20 blur-[50px] pointer-events-none -z-10" />
-            <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-accent/15 blur-[50px] pointer-events-none -z-10" />
+          <div className="w-full max-w-xl bg-card rounded-[24px] border border-white/8 hover:border-white/12 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden p-6 sm:p-8 md:p-10 group transition-all duration-300">
+            <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full glow-primary-sm pointer-events-none -z-10" />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full glow-accent-sm pointer-events-none -z-10" />
 
             {/* Mobile Branding */}
             <div className="block lg:hidden text-center mb-8 space-y-2">

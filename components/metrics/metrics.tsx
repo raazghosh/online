@@ -79,7 +79,7 @@ export function Metrics() {
       <div className="max-w-[1280px] mx-auto px-6">
         <Card className="p-8 sm:p-12 relative overflow-hidden border-border/85 shadow-2xl">
           {/* Subtle background highlight */}
-          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-primary/10 blur-[80px] -z-10 rounded-full" />
+          <div className="absolute top-0 right-0 w-[300px] h-[300px] glow-primary-md -z-10 rounded-full" />
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 divide-y md:divide-y-0 md:divide-x divide-border">
             {metrics.map((metric, idx) => (

@@ -35,7 +35,10 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function FeedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout, isInitialized, initializeSession } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const logout = useVotingStore((state) => state.logout);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -103,8 +106,8 @@ export default function FeedLayout({ children }: { children: React.ReactNode }) 
     <div className="relative min-h-screen bg-background text-foreground flex select-none overflow-x-hidden">
       {/* Glow Effects */}
       <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-primary/5 via-accent/2 to-transparent pointer-events-none -z-10" />
-      <div className="absolute top-[30%] left-[-10%] w-[35vw] h-[35vw] rounded-full bg-primary/3 blur-[120px] pointer-events-none -z-10" />
-      <div className="absolute bottom-[10%] right-[-10%] w-[35vw] h-[35vw] rounded-full bg-accent/3 blur-[120px] pointer-events-none -z-10" />
+      <div className="absolute top-[30%] left-[-10%] w-[35vw] h-[35vw] rounded-full glow-primary-lg opacity-30 pointer-events-none -z-10" />
+      <div className="absolute bottom-[10%] right-[-10%] w-[35vw] h-[35vw] rounded-full glow-accent-lg opacity-30 pointer-events-none -z-10" />
       <div className="absolute inset-0 grid-bg opacity-[0.25] pointer-events-none -z-20" />
 
       {/* Sidebar Frame */}

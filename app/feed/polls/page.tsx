@@ -47,7 +47,9 @@ interface UIInstancePoll {
 
 export default function PollsPage() {
   const router = useRouter();
-  const { user, createdPollIds, votedPollIds } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const createdPollIds = useVotingStore((state) => state.createdPollIds);
+  const votedPollIds = useVotingStore((state) => state.votedPollIds);
 
   const [polls, setPolls] = useState<UIInstancePoll[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,7 +284,7 @@ export default function PollsPage() {
           {Array.from({ length: 2 }).map((_, idx) => (
             <div
               key={idx}
-              className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-6 animate-pulse"
+              className="bg-card border border-white/10 rounded-3xl p-6 flex flex-col justify-between space-y-6 animate-pulse"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -321,7 +323,7 @@ export default function PollsPage() {
             return (
               <div
                 key={poll.id}
-                className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between space-y-6 hover:border-white/15 transition-all"
+                className="bg-card border border-white/10 rounded-3xl p-6 flex flex-col justify-between space-y-6 hover:border-white/15 transition-all"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

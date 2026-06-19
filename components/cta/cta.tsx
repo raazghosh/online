@@ -17,7 +17,7 @@ export function CTA() {
   return (
     <section className="py-20 relative z-10 overflow-hidden">
       {/* Background ambient orbs */}
-      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-[200px] bg-primary/10 blur-[100px] -z-10 rounded-full" />
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-[200px] glow-primary-lg -z-10 rounded-full" />
 
       <div className="max-w-[1280px] mx-auto px-6">
         <motion.div

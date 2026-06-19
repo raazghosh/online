@@ -13,7 +13,7 @@ export function TrustedBy() {
   ];
 
   return (
-    <section className="py-12 border-y border-border/50 bg-surface/30 backdrop-blur-sm relative z-10 overflow-hidden">
+    <section className="py-12 border-y border-border/50 bg-surface/30 relative z-10 overflow-hidden">
       <div className="max-w-[1280px] mx-auto px-6">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
           

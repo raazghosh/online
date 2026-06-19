@@ -35,7 +35,8 @@ interface TeamMember {
 }
 
 export default function TeamPage() {
-  const { user, isInitialized } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
 
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeam, setActiveTeam] = useState<any | null>(null);
@@ -211,7 +212,7 @@ export default function TeamPage() {
       {activeTeam ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Member List */}
-          <div className="lg:col-span-8 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-6">
+          <div className="lg:col-span-8 bg-card border border-white/10 rounded-3xl p-6 space-y-6">
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">Active Administrative Team</h2>
 
             {members.length === 0 ? (
@@ -266,7 +267,7 @@ export default function TeamPage() {
           </div>
 
           {/* Permission Matrix */}
-          <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+          <div className="lg:col-span-4 bg-card border border-white/10 rounded-3xl p-6 space-y-4">
             <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
               <Shield className="w-4 h-4 text-primary" /> Permission Matrix
             </h3>

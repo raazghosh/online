@@ -9,19 +9,27 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 
 export function VotingSimulator() {
-  const {
-    simulatorStep,
-    setSimulatorStep,
-    simulatorChoice,
-    setSimulatorChoice,
-    voterVerificationData,
-    setVoterVerificationData,
-    generatedReceipt,
-    setGeneratedReceipt,
-    incrementVote,
-    addAuditLog,
-    nodes,
-  } = useVotingStore();
+  const simulatorStep = useVotingStore((state) => state.simulatorStep);
+  const setSimulatorStep = useVotingStore((state) => state.setSimulatorStep);
+  const simulatorChoice = useVotingStore((state) => state.simulatorChoice);
+  const setSimulatorChoice = useVotingStore((state) => state.setSimulatorChoice);
+  const voterVerificationData = useVotingStore((state) => state.voterVerificationData);
+  const setVoterVerificationData = useVotingStore((state) => state.setVoterVerificationData);
+  const generatedReceipt = useVotingStore((state) => state.generatedReceipt);
+  const setGeneratedReceipt = useVotingStore((state) => state.setGeneratedReceipt);
+  const incrementVote = useVotingStore((state) => state.incrementVote);
+  const addAuditLog = useVotingStore((state) => state.addAuditLog);
+  const activeNodesJson = useVotingStore((state) =>
+    JSON.stringify(
+      state.nodes
+        .filter((n) => n.status === "active")
+        .map((n) => ({ id: n.id, name: n.name, status: n.status }))
+    )
+  );
+  const activeNodes: Array<{ id: string; name: string; status: string }> = React.useMemo(
+    () => JSON.parse(activeNodesJson),
+    [activeNodesJson]
+  );
 
   const [fullName, setFullName] = useState("");
   const [voterId, setVoterId] = useState("");
@@ -70,7 +78,6 @@ export function VotingSimulator() {
   useEffect(() => {
     if (simulatorStep !== 3) return;
     setValidatedNodes([]);
-    const activeNodes = nodes.filter(n => n.status === "active");
     let index = 0;
     const interval = setInterval(() => {
       if (index < activeNodes.length) {
@@ -124,7 +131,7 @@ export function VotingSimulator() {
     }, 700);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulatorStep]);
+  }, [simulatorStep, activeNodes]);
 
   const handleStartVoting = (choice: "YES" | "NO" | "ABSTAIN") => {
     setSimulatorChoice(choice);
@@ -415,7 +422,7 @@ export function VotingSimulator() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 my-4">
-                      {nodes.filter(n => n.status === "active").map((node) => {
+                      {activeNodes.map((node) => {
                         const isNodeValidated = validatedNodes.includes(node.id);
                         return (
                           <div

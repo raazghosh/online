@@ -28,7 +28,9 @@ import {
 
 export default function VerificationPage() {
   const router = useRouter();
-  const { user, isInitialized, initializeSession } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -193,7 +195,7 @@ export default function VerificationPage() {
           
           {/* Aadhaar Panel (Voters only) */}
           {user?.role === "voter" && (
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+            <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
@@ -242,7 +244,7 @@ export default function VerificationPage() {
           )}
 
           {/* Contact Verification Panel */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+          <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white">Contact & Voter Registry Verification</h3>
 
             <div className="space-y-3">
@@ -270,7 +272,7 @@ export default function VerificationPage() {
 
           {/* Org Verification Panel (Organizations only) */}
           {user?.role === "admin" && (
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4">
+            <div className="bg-card border border-white/10 rounded-3xl p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
@@ -411,7 +413,7 @@ export default function VerificationPage() {
         </div>
 
         {/* Informative Side Card */}
-        <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm space-y-4 hover:border-white/15 transition-all">
+        <div className="lg:col-span-4 bg-card border border-white/10 rounded-3xl p-6 space-y-4 hover:border-white/15 transition-all">
           <h3 className="text-xs font-bold text-white/60 uppercase tracking-wider flex items-center gap-1.5">
             <ShieldAlert className="w-4 h-4 text-primary animate-pulse" /> ZK-Proof Architecture
           </h3>

@@ -28,7 +28,11 @@ import { apiGetPoll, apiGetResults, apiGetPolls } from "@/lib/api";
 
 export default function FeedDashboard() {
   const router = useRouter();
-  const { user, createdPollIds, votedPollIds, isInitialized, initializeSession } = useVotingStore();
+  const user = useVotingStore((state) => state.user);
+  const createdPollIds = useVotingStore((state) => state.createdPollIds);
+  const votedPollIds = useVotingStore((state) => state.votedPollIds);
+  const isInitialized = useVotingStore((state) => state.isInitialized);
+  const initializeSession = useVotingStore((state) => state.initializeSession);
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [elections, setElections] = useState<any[]>([]);
@@ -118,7 +122,7 @@ export default function FeedDashboard() {
     <div className="space-y-8 select-none">
       {/* Welcome Card & Info Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 md:p-8 backdrop-blur-md relative overflow-hidden flex flex-col justify-between group hover:border-border/80 transition-all">
+        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 md:p-8 relative overflow-hidden flex flex-col justify-between group hover:border-border/80 transition-all">
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-[60px] pointer-events-none -z-10 group-hover:scale-110 transition-transform duration-500" />
           <div className="space-y-4">
             {user?.isVerified ? (
@@ -177,7 +181,7 @@ export default function FeedDashboard() {
         </div>
 
         {/* Quick Actions Panel */}
-        <div className="lg:col-span-4 bg-card border border-border rounded-3xl p-6 backdrop-blur-md flex flex-col justify-between hover:border-border/80 transition-all">
+        <div className="lg:col-span-4 bg-card border border-border rounded-3xl p-6 flex flex-col justify-between hover:border-border/80 transition-all">
           <div>
             <h2 className="text-sm font-bold tracking-wider text-foreground/60 uppercase">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-3 mt-4">
@@ -238,7 +242,7 @@ export default function FeedDashboard() {
           return (
             <div
               key={i}
-              className="bg-card border border-border rounded-2xl p-5 backdrop-blur-sm flex items-center justify-between group hover:border-border/80 transition-all"
+              className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between group hover:border-border/80 transition-all"
             >
               <div className="space-y-1">
                 <span className="text-xs text-foreground/40 font-semibold">{stat.label}</span>
@@ -260,7 +264,7 @@ export default function FeedDashboard() {
       {/* Recent Elections Feed & Analytics Widget */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Elections Feed */}
-        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 backdrop-blur-md space-y-6">
+        <div className="lg:col-span-8 bg-card border border-border rounded-3xl p-6 space-y-6">
           <div className="flex items-center justify-between border-b border-border pb-4">
             <div>
               <h2 className="text-lg font-bold text-foreground">Recent Elections Feed</h2>
@@ -361,7 +365,7 @@ export default function FeedDashboard() {
         {/* Side Widget: Turnout Analytics & Notification Log */}
         <div className="lg:col-span-4 space-y-6">
           {/* Turnout Widget */}
-          <div className="bg-card border border-border rounded-3xl p-6 backdrop-blur-md hover:border-border/80 transition-all">
+          <div className="bg-card border border-border rounded-3xl p-6 hover:border-border/80 transition-all">
             <h3 className="text-xs font-bold text-foreground/60 uppercase tracking-wider flex items-center justify-between">
               <span>Turnout Trend</span>
               <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -397,7 +401,7 @@ export default function FeedDashboard() {
           </div>
 
           {/* Activity Ledger Feed */}
-          <div className="bg-card border border-border rounded-3xl p-6 backdrop-blur-md hover:border-border/80 transition-all">
+          <div className="bg-card border border-border rounded-3xl p-6 hover:border-border/80 transition-all">
             <h3 className="text-xs font-bold text-foreground/60 uppercase tracking-wider flex items-center gap-1.5 mb-4">
               <Activity className="w-4 h-4 text-primary animate-pulse" />
               <span>Activity Log</span>

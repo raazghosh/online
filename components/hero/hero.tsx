@@ -43,8 +43,8 @@ export function Hero() {
   return (
     <section className="relative min-h-screen pt-32 pb-20 flex items-center justify-center overflow-hidden">
       {/* Background Orbs */}
-      <div className="absolute top-[20%] left-[10%] w-[30vw] h-[30vw] rounded-full bg-primary/10 blur-[120px] animate-pulse-slow z-0 pointer-events-none" />
-      <div className="absolute bottom-[20%] right-[10%] w-[35vw] h-[35vw] rounded-full bg-accent/80 blur-[130px] opacity-[0.06] animate-pulse-slow z-0 pointer-events-none" />
+      <div className="absolute top-[20%] left-[10%] w-[30vw] h-[30vw] rounded-full glow-primary-lg animate-pulse-slow z-0 pointer-events-none" />
+      <div className="absolute bottom-[20%] right-[10%] w-[35vw] h-[35vw] rounded-full glow-accent-lg opacity-60 animate-pulse-slow z-0 pointer-events-none" />
 
       {/* Grid Pattern Overlay */}
       <div className="absolute inset-0 grid-bg opacity-[0.4] z-0 pointer-events-none" />
@@ -100,7 +100,7 @@ export function Hero() {
         {/* Right Side: Animated Orb System & Floating Cards */}
         <div className="lg:col-span-6 flex items-center justify-center relative min-h-[480px] select-none">
           {/* Inner Glow Center */}
-          <div className="absolute w-[180px] h-[180px] rounded-full bg-primary/20 blur-[60px] z-0" />
+          <div className="absolute w-[180px] h-[180px] rounded-full glow-primary-md z-0" />
 
           {/* Orbiting Rings container */}
           <div className="relative w-[280px] h-[280px] sm:w-[340px] sm:h-[340px] flex items-center justify-center">
